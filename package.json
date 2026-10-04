@@ -1,0 +1,33 @@
+{
+  "name": "project-exodus",
+  "version": "1.0.0",
+  "description": "A server-authoritative low-poly post-apocalyptic survival island for Decentraland Worlds",
+  "scripts": {
+    "start": "sdk-commands start",
+    "deploy": "sdk-commands deploy",
+    "build": "sdk-commands build",
+    "typecheck": "tsc --noEmit",
+    "generate:arena": "node scripts/generate-composite.mjs && node scripts/generate-outpost-map.mjs",
+    "generate:ui": "node scripts/generate-ui-icons.mjs",
+    "package:release": "node scripts/package-release.mjs",
+    "validate": "node scripts/validate-project.mjs",
+    "upgrade-sdk": "npm install --save-dev @dcl/sdk@latest",
+    "upgrade-sdk:next": "npm install --save-dev @dcl/sdk@next",
+    "server-logs": "sdk-commands sdk-server-logs"
+  },
+  "devDependencies": {
+    "@dcl/js-runtime": "7.28.1-34624845556.commit-7d0808b",
+    "@dcl/sdk": "7.28.1-34624845556.commit-7d0808b",
+    "archiver": "^7.0.1"
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=6.0.0"
+  },
+  "prettier": {
+    "semi": false,
+    "singleQuote": true,
+    "printWidth": 120,
+    "trailingComma": "none"
+  }
+}

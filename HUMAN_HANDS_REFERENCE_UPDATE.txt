@@ -1,0 +1,13 @@
+PROJECT EXODUS v30 - HUMAN HANDS REFERENCE UPDATE
+
+Updated src/client/viewmodel.ts from the supplied hand reference.
+- Rebuilt both first-person hands with more human proportions.
+- Black segmented fingerless tactical gloves.
+- Exposed skin fingertips and thumb tips.
+- Reinforced knuckle armor and broad back-of-hand plate.
+- Wider tactical wrist cuff.
+- Left wrist now carries the rugged green-screen field watch from the reference.
+- Left-hand thumb orientation and finger articulation preserved for weapon grip.
+- Existing rifle/pistol/shotgun, recoil, reload, scope, inventory, map, world and gameplay code retained.
+
+Note: Typecheck could not run in the unpacked release because node_modules/@dcl/sdk is not included in the supplied ZIP. No dependency files were changed.

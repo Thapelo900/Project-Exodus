@@ -1,0 +1,7 @@
+Project Exodus v31 - Supplied GLB Hands
+
+- Replaced the procedural first-person hand meshes with the exact user-supplied Meshy hand GLB.
+- The supplied asset is loaded once because it contains the complete two-hand model.
+- Both left and right hands therefore remain part of the same authored model and cannot diverge/disappear from mirrored procedural placement.
+- Existing rifle, pistol, shotgun, firing, recoil, scope, inventory and world systems are retained.
+- The old procedural hand entities remain only as invisible animation anchors to avoid breaking existing gameplay code.

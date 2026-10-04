@@ -1,0 +1,9 @@
+PROJECT EXODUS v32 - NEW HANDS
+- Replaced previous supplied hand model with the user's New hands.glb.
+- Preserved the exact uploaded GLB in assets/Models/NewHands_Original.glb.
+- Split authored mesh into independent left and right hand GLBs so both hands render and animate independently.
+- Added tactical coloring: exposed skin sections use a medium-brown fallback; glove/watch region is black/dark tactical material.
+- Walking spreads hands apart; running spreads them farther apart.
+- Shooting pulls both hands together into the weapon grip.
+- Reloading also pulls the hands together while the existing reload motion plays.
+- Existing weapons/gameplay/world retained.

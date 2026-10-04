@@ -1,0 +1,13 @@
+import { Entity, Material, MeshRenderer, Transform, engine } from '@dcl/sdk/ecs'
+import { Color4, Quaternion, Vector3 } from '@dcl/sdk/math'
+import { BombState } from '../shared/schemas'
+import { playBombExplosionSound } from './audio'
+
+type Visual={root:Entity;parts:Entity[];phase:string;age:number;lastPosition:Vector3}
+const visuals=new Map<string,Visual>()
+
+function part(parent:Entity,position:Vector3,scale:Vector3,color:string,cylinder=false,emissive=0){const entity=engine.addEntity();Transform.create(entity,{position,scale,parent});if(cylinder)MeshRenderer.setCylinder(entity,.5,.5);else MeshRenderer.setBox(entity);const c=Color4.fromHexString(color);Material.setPbrMaterial(entity,{albedoColor:c,emissiveColor:emissive?c:undefined,emissiveIntensity:emissive,metallic:.35,roughness:.42});return entity}
+function create(entity:Entity,position:Vector3){const root=engine.addEntity();Transform.create(root,{parent:entity});const parts=[part(root,Vector3.create(0,.02,0),Vector3.create(1.08,.18,1.08),'#ffd62aff',true,3),part(root,Vector3.create(0,.43,0),Vector3.create(.55,.26,.55),'#14171aff'),part(root,Vector3.create(.28,.45,0),Vector3.create(.12,.48,.18),'#24282dff',false),part(root,Vector3.create(.45,.52,0),Vector3.create(.28,.045,.28),'#b72cffff',true,5)];return{root,parts,phase:'thrown',age:0,lastPosition:Vector3.clone(position)}}
+function destroy(v:Visual){for(const entity of v.parts)engine.removeEntity(entity);engine.removeEntity(v.root)}
+function system(dt:number){const seen=new Set<string>(),now=Date.now()/1000;for(const[entity,bomb,transform]of engine.getEntitiesWith(BombState,Transform)){seen.add(bomb.bombId);let v=visuals.get(bomb.bombId);if(!v){v=create(entity,transform.position);visuals.set(bomb.bombId,v)}v.lastPosition=Vector3.clone(transform.position);if(bomb.phase==='thrown'){Transform.getMutable(v.root).rotation=Quaternion.fromEulerDegrees(now*170,now*230,now*90)}else if(v.phase!=='blast'){v.phase='blast';v.age=0;playBombExplosionSound();const root=Transform.getMutable(v.root);root.parent=engine.RootEntity;root.position=Vector3.clone(v.lastPosition);for(const p of v.parts){const c=Color4.fromHexString('#ff8b20ff');Material.setPbrMaterial(p,{albedoColor:c,emissiveColor:c,emissiveIntensity:12,metallic:0,roughness:.15})}}}for(const[id,v]of visuals){if(v.phase==='blast'){v.age+=dt;const p=Math.min(1,v.age/.52),scale=.5+Math.sin(p*Math.PI)*9,root=Transform.getMutable(v.root);root.scale=Vector3.create(scale,scale,scale);root.rotation=Quaternion.fromEulerDegrees(p*180,p*360,0);if(p>=1){destroy(v);visuals.delete(id)}}else if(!seen.has(id)){destroy(v);visuals.delete(id)}}}
+export function setupBombVisuals(){engine.addSystem(system)}

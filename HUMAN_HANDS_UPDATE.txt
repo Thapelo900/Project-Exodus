@@ -1,0 +1,13 @@
+Project Exodus - Human Hands / Weapon Viewmodel Update
+
+Updated src/client/viewmodel.ts:
+- Rifle, shotgun and pistol retain their existing distinct weapon geometry and gameplay integration.
+- Reworked first-person hands toward a more human appearance.
+- Exposed avatar-skin-colored palms, fingers, thumbs and fingertips.
+- Converted gloves to fingerless tactical gloves with palm padding, knuckle protection, wrist cuffs and existing left-wrist field watch.
+- Forearms changed from rectangular blocks to rounded/cylindrical skin geometry for a less blocky silhouette.
+- Hand skin continues to synchronize to the player's Decentraland avatar skin color.
+- Existing grip/finger animation, recoil, reload, weapon switching, aiming, muzzle flash, smoke and casing systems retained.
+
+Validation note:
+The source edit is syntactically localized. Full `npm run typecheck` could not run in this extracted copy because node_modules/@dcl/sdk is not included in the uploaded ZIP; the compiler reports missing SDK/type dependencies across the untouched project as well.
