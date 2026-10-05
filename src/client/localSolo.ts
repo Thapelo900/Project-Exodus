@@ -67,6 +67,9 @@ const botParts = new Map<string, Entity[]>()
 const kingModels = new Map<string, Entity>()
 const kingAnimationState = new Map<string, string>()
 const kingAttackFlip = new Map<string, boolean>()
+const deadEnemyRemoveAt = new Map<Entity, number>()
+const enemyBlockedRoarAt = new Map<string, number>()
+const mutantProbeNextAt = new Map<Entity, number>()
 const localProjectiles = new Map<Entity, { velocity: Vector3; damage: number; expiresAt: number; toxic:boolean }>()
 const localImpactFx = new Map<Entity,{expiresAt:number;toxic:boolean;damage:number;lastTick:number}>()
 const localBombs = new Map<Entity, { velocity: Vector3; explodeAt: number; blastUntil: number; exploded: boolean }>()
@@ -216,7 +219,7 @@ export function startLocalSolo(difficulty: Difficulty = 'normal') {
     missionId: 'reach-city', missionComplete: false, missionsCompleted: 0, mutantKills:0, droneKills:0, lootCollected:0, explosivesUsed:0, healingDone:0, watersUsed:0, tradesCompleted:0, soloMissions:0, coopMissions:0, suppliesDelivered:0, outpostDefenses:0, cleanSweeps:0, locationsDiscovered:0, missionTypesMask:0, noHitMissions:0, headshots:0, legendaryLoot:0, weaponsCollected:0, speedRuns:0, nightMissions:0, missionDamageTaken:0, missionStartedAt:now, joined: true, alive: true
   })
   const initialPlan=deployMissionHostiles(1)
-  MatchState.getMutable(matchEntity).announcement=`${initialPlan.gm.name} — MUTANTS ${initialPlan.mutants} • DRONES ${initialPlan.drones} • KINGS ${initialPlan.kings}`
+  MatchState.getMutable(matchEntity).announcement=`${initialPlan.gm.name} — ${initialPlan.gm.objective} • ${initialPlan.gm.difficulty}`
   for (let index = 0; index < WORLD_LOOT_SPAWNS.length; index += 1) makeLoot(index)
   for (let index = 0; index < GAME.pandoraBoxesPerRound; index += 1) makePandoraBox(index)
   engine.addSystem(localSoloSystem)
@@ -276,7 +279,9 @@ export function fireLocalWeapon(direction: Vector3) {
     const defeatedTransform=Transform.getMutable(closest)
     if(bot.family==='drone'||bot.variant==='king-mutant')makeDroneAmmoDrop(bot,defeatedTransform.position)
     if(bot.variant!=='king-mutant') defeatedTransform.rotation = Quaternion.fromEulerDegrees(0,0,bot.family==='mutant'?82:28)
-    defeatedTransform.position.y = .35
+    // Dead enemies become non-collidable immediately, remain visible for 5 seconds, then vanish.
+    MeshCollider.deleteFrom(closest)
+    deadEnemyRemoveAt.set(closest, Date.now()+5000)
     player.kills += 1
     player.materials += bot.variant === 'berserker-mutant' || bot.variant === 'support-drone' ? 5 : 3
   }
@@ -533,11 +538,11 @@ function mutantGroundAllowed(p:{x:number,z:number}){return isOnMutantIslandGroun
 // Do not use generic downward raycasts here: they can hit roofs/upper GLB geometry and lift enemies into the air.
 // The shared terrain profile matches the authored IslandTerrain/bridge root heights and only drops to water
 // after a normal Mutant has actually left valid island/bridge ground during an acquired chase.
-function groundedMutantY(_owner:Entity,position:Vector3){return mutantSurfaceY(position)}
+function groundedMutantY(owner:Entity,position:Vector3){const bot=BotState.getOrNull(owner);return mutantSurfaceY(position)+(bot?.variant==='king-mutant'?.12:.06)}
 
 function mutantSafeStep(entity:Entity,position:Vector3,direction:Vector3,step:number){
   const flat=Vector3.normalize(Vector3.create(direction.x,0,direction.z));if(Vector3.length(flat)<.001)return Vector3.clone(position)
-  const left=Vector3.normalize(Vector3.create(-flat.z,0,flat.x)),right=Vector3.scale(left,-1),max=Math.max(2.8,step+2.25),p=ensureMutantProbes(entity,position)
+  const left=Vector3.normalize(Vector3.create(-flat.z,0,flat.x)),right=Vector3.scale(left,-1),bot=BotState.getOrNull(entity),clearance=bot?.variant==='king-mutant'?6.2:2.8,max=Math.max(clearance,step+clearance*.8),p=ensureMutantProbes(entity,position)
   // Results belong to the rays aimed on the previous frame. Movement is only allowed when
   // that probe reports clear; then immediately queue the next three world-physics queries.
   const fb=probeBlocked(p.f,max),lb=probeBlocked(p.l,max),rb=probeBlocked(p.r,max),flb=probeBlocked(p.fl,max),frb=probeBlocked(p.fr,max),now=Date.now()
@@ -574,6 +579,8 @@ function updateBots(dt: number, player: ReturnType<typeof PlayerState.getMutable
   const now = Date.now()
   const playerSafe = isInsideOutpost(playerPosition)
   updateLocalProjectiles(dt,player,playerPosition)
+  // v264: corpses are visual-only for exactly five seconds; remove root + child models afterwards.
+  for(const [deadEntity,removeAt] of deadEnemyRemoveAt){if(now<removeAt)continue;const deadTransform=Transform.getMutableOrNull(deadEntity);if(deadTransform)deadTransform.scale=Vector3.Zero();deadEnemyRemoveAt.delete(deadEntity)}
   for (const entity of botEntities) {
     const bot = BotState.getMutableOrNull(entity)
     const transform = Transform.getMutableOrNull(entity)
@@ -589,7 +596,7 @@ function updateBots(dt: number, player: ReturnType<typeof PlayerState.getMutable
     const acquired=bot.family==='mutant'&&botHasSeenPlayer.get(bot.botId)===true
     const kingPlayerOnHome=bot.variant!=='king-mutant'||sameKingIsland(bot,playerPosition)
     const detected=!playerSafe&&kingPlayerOnHome&&(acquired||distance<=bot.detection*(bot.family==='mutant'?1.35:1)||((bot.aiState==='alert'||bot.aiState==='chase'||bot.aiState==='attack')&&distance<=bot.detection*(bot.family==='mutant'?2.25:1.8)))
-    if(!detected){if(bot.variant==='king-mutant'&&!kingPlayerOnHome){botHasSeenPlayer.set(bot.botId,false);bot.targetId=''}bot.aiState='patrol';if(bot.variant==='king-mutant')playLocalKingAnimation(bot.botId,'Walk');const phase=now/(bot.variant==='king-mutant'?1500:1450)+entity,patrolRadius=bot.variant==='king-mutant'?28:10,homeIsland=bot.variant==='king-mutant'?kingHomeIsland(bot):undefined,rawPatrol=bot.variant==='king-mutant'&&homeIsland?Vector3.create(homeIsland.x+Math.sin(phase+(Math.floor(now/6000)+entity)*1.37)*homeIsland.rx*(.28+((entity+Math.floor(now/6000))%4)*.055),transform.position.y,homeIsland.z+Math.cos(phase*.71+(Math.floor(now/6000)+entity)*.91)*homeIsland.rz*(.28+((entity+2+Math.floor(now/6000))%4)*.055)):Vector3.create(bot.homeX+Math.sin(phase)*patrolRadius,bot.airborne?7+Math.sin(phase)*2:transform.position.y,bot.homeZ+Math.cos(phase)*patrolRadius),patrolNav={x:rawPatrol.x,z:rawPatrol.z},target=Vector3.create(patrolNav.x,rawPatrol.y,patrolNav.z);const direction=Vector3.normalize(Vector3.subtract(target,transform.position));const patrolStep=bot.speed*(bot.family==='mutant'?.58:.3)*dt;let next=bot.family==='mutant'?mutantSafeStep(entity,transform.position,direction,patrolStep):Vector3.add(transform.position,Vector3.scale(direction,patrolStep));if(!isInsideOutpost(next)&&(bot.airborne||bot.family==='mutant')){const groundAllowed=bot.variant==='king-mutant'?kingGroundAllowed(bot,next):true;if(groundAllowed){transform.position=next;if(!bot.airborne){transform.position.y=groundedMutantY(entity,transform.position)}}}continue}
+    if(!detected){if(bot.variant==='king-mutant'&&!kingPlayerOnHome){botHasSeenPlayer.set(bot.botId,false);bot.targetId=''}bot.aiState='patrol';if(bot.variant==='king-mutant')playLocalKingAnimation(bot.botId,'Walk');const phase=now/(bot.variant==='king-mutant'?1500:1450)+entity,patrolRadius=bot.variant==='king-mutant'?28:10,homeIsland=bot.variant==='king-mutant'?kingHomeIsland(bot):undefined,rawPatrol=bot.variant==='king-mutant'&&homeIsland?Vector3.create(homeIsland.x+Math.sin(phase+(Math.floor(now/6000)+entity)*1.37)*homeIsland.rx*(.28+((entity+Math.floor(now/6000))%4)*.055),transform.position.y,homeIsland.z+Math.cos(phase*.71+(Math.floor(now/6000)+entity)*.91)*homeIsland.rz*(.28+((entity+2+Math.floor(now/6000))%4)*.055)):Vector3.create(bot.homeX+Math.sin(phase)*patrolRadius,bot.airborne?7+Math.sin(phase)*2:transform.position.y,bot.homeZ+Math.cos(phase)*patrolRadius),patrolNav={x:rawPatrol.x,z:rawPatrol.z},target=Vector3.create(patrolNav.x,rawPatrol.y,patrolNav.z);const direction=Vector3.normalize(Vector3.subtract(target,transform.position));const patrolStep=bot.speed*(bot.family==='mutant'?1.05:.42)*dt;let next=bot.family==='mutant'?mutantSafeStep(entity,transform.position,direction,patrolStep):Vector3.add(transform.position,Vector3.scale(direction,patrolStep));if(!isInsideOutpost(next)&&(bot.airborne||bot.family==='mutant')){const groundAllowed=bot.variant==='king-mutant'?kingGroundAllowed(bot,next):true;if(groundAllowed){transform.position=next;if(!bot.airborne){transform.position.y=groundedMutantY(entity,transform.position)}}}continue}
     bot.targetId='local-player';bot.lastKnownX=playerPosition.x;bot.lastKnownZ=playerPosition.z;bot.lastSeenAt=now
     // Mutant/King alert plays only on the moment this hostile newly sees/acquires the player.
     // audio.ts owns a single shared source, so simultaneous detections can never overlap.
@@ -602,13 +609,14 @@ function updateBots(dt: number, player: ReturnType<typeof PlayerState.getMutable
       
       if(bot.family==='mutant'){if(bot.variant==='king-mutant'){const n=entity,angle=now/780+n*1.73,radius=Math.min(7,Math.max(3.4,distance*.22));target=Vector3.create(target.x+Math.cos(angle)*radius,target.y,target.z+Math.sin(angle)*radius);target=Vector3.create(target.x,transform.position.y,target.z)}else{const flankAngle=now/2100+entity*2.17,flankRadius=1.4+(entity%4)*.55;target=Vector3.create(playerPosition.x+Math.cos(flankAngle)*flankRadius,transform.position.y,playerPosition.z+Math.sin(flankAngle)*flankRadius)}}
       const direction = Vector3.normalize(Vector3.subtract(target, transform.position))
-      const boost=bot.family==='mutant'?(bot.variant==='berserker-mutant'?1.6:bot.variant==='king-mutant'?1.45:1.08):1
+      const boost=bot.family==='mutant'?(bot.variant==='berserker-mutant'?1.9:bot.variant==='king-mutant'?1.75:1.38):1.08
       const step=bot.speed*boost*dt
       const next = Vector3.add(transform.position, Vector3.scale(direction, step))
       const moveNext=bot.family==='mutant'?mutantSafeStep(entity,transform.position,direction,step):next
       if(!isInsideOutpost(moveNext)){const groundAllowed=bot.variant==='king-mutant'?kingGroundAllowed(bot,moveNext):true;if((bot.airborne||bot.family==='mutant')&&groundAllowed){transform.position.x=Math.max(2,Math.min(GAME.arenaSize-2,moveNext.x));transform.position.z=Math.max(2,Math.min(GAME.arenaSize-2,moveNext.z));if(!bot.airborne){transform.position.y=groundedMutantY(entity,transform.position)}}}
       if(bot.airborne)transform.position.y=Math.max(5,Math.min(12,next.y))
-      transform.rotation = Quaternion.lookRotation(direction)
+      const faceDirection=bot.variant==='king-mutant'?Vector3.normalize(Vector3.create(playerPosition.x-transform.position.x,0,playerPosition.z-transform.position.z)):direction
+      transform.rotation = Quaternion.lookRotation(faceDirection)
     } else {
       // v79: Kings keep advancing on a detected player while they fire.
       if(bot.family==='mutant'&&distance>.55){
