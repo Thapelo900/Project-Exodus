@@ -205,14 +205,10 @@ function controlsOverlay(){if(!clientState.controlsOpen)return null;return <UiEn
 
 function welcomeScreen(){
  if(!clientState.welcomeOpen)return null
- const now=Date.now(),loading=clientState.welcomeLoadingUntil>0,remaining=loading?Math.max(0,clientState.welcomeLoadingUntil-now):0
- if(loading&&remaining<=0){clientState.welcomeOpen=false;clientState.welcomeLoadingUntil=0;return null}
- const hover=clientState.hoveredMenuButton==='welcome-enter',pct=loading?Math.max(0,Math.min(100,Math.round((1-remaining/10000)*100))):0
+ const hover=clientState.hoveredMenuButton==='welcome-enter'
  const mobileMenu=clientState.isMobile;return <UiEntity uiTransform={mobileMenu?{positionType:'absolute',position:{left:'50%',top:'50%'},margin:'-281.25px 0 0 -500px',width:1000,height:562.5,zIndex:190,pointerFilter:'block'}:{positionType:'absolute',position:{left:0,top:0},width:1920,height:1080,zIndex:190,pointerFilter:'block'}} uiBackground={{texture:{src:'images/project-exodus-welcome.png'},textureMode:'stretch'}}>
    {hover&&<UiEntity uiTransform={{positionType:'absolute',position:mobileMenu?{left:310.42,top:424.48}:{left:596,top:815},width:mobileMenu?379.17:728,height:mobileMenu?63.54:122,zIndex:191,pointerFilter:'none'}} uiBackground={{texture:{src:'images/ui/welcome-enter-hover.png'},textureMode:'stretch'}}/>}
-   <Button value="" uiTransform={{positionType:'absolute',position:mobileMenu?{left:310.42,top:424.48}:{left:596,top:815},width:mobileMenu?379.17:728,height:mobileMenu?63.54:122,zIndex:192,borderWidth:0}} uiBackground={{color:Color4.fromHexString('#00000001')}} onMouseEnter={()=>{if(clientState.hoveredMenuButton!=='welcome-enter'){clientState.hoveredMenuButton='welcome-enter';playUiHoverSound()}}} onMouseLeave={()=>{if(clientState.hoveredMenuButton==='welcome-enter')clientState.hoveredMenuButton=''}} onMouseDown={()=>{if(!loading){clientState.hoveredMenuButton='welcome-pressed';clientState.welcomeLoadingUntil=Date.now()+10000}}}/>
-   
-   {loading&&<UiEntity uiTransform={{positionType:'absolute',position:mobileMenu?{left:317.71,top:481.77}:{left:610,top:925},width:mobileMenu?364.58:700,height:mobileMenu?47.92:92,zIndex:193,padding:12,flexDirection:'column',alignItems:'center'}} uiBackground={{color:Color4.fromHexString('#050505dd')}}><Label value={`INITIALIZING EXODUS  ${pct}%`} fontSize={20} color={c.white} uiTransform={{width:660,height:32}}/><UiEntity uiTransform={{width:660,height:28,borderColor:c.red,borderWidth:3}} uiBackground={{color:Color4.fromHexString('#180408ee')}}><UiEntity uiTransform={{width:`${pct}%`,height:22}} uiBackground={{color:Color4.fromHexString('#e9162fff')}}/></UiEntity></UiEntity>}
+   <Button value="" uiTransform={{positionType:'absolute',position:mobileMenu?{left:310.42,top:424.48}:{left:596,top:815},width:mobileMenu?379.17:728,height:mobileMenu?63.54:122,zIndex:192,borderWidth:0}} uiBackground={{color:Color4.fromHexString('#00000001')}} onMouseEnter={()=>{if(clientState.hoveredMenuButton!=='welcome-enter'){clientState.hoveredMenuButton='welcome-enter';playUiHoverSound()}}} onMouseLeave={()=>{if(clientState.hoveredMenuButton==='welcome-enter')clientState.hoveredMenuButton=''}} onMouseDown={()=>{clientState.hoveredMenuButton='welcome-pressed';clientState.welcomeLoadingUntil=0;clientState.welcomeOpen=false}}/>
  </UiEntity>
 }
 
