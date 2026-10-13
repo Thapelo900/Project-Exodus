@@ -149,6 +149,8 @@ function playKingAnimation(entity:Entity, botId:string, clip:string, force=false
   kingAnimationState.set(botId,clip); Animator.playSingleAnimation(entity,clip)
 }
 
+const ZOMBIE_WALK_EMOTE = 'urn:decentraland:matic:collections-v2:0xee3d536845a4750906b3dbc66629f6aed3023f27:5'
+const mutantWalkStates = new Map<string, boolean>()
 const enemyEmoteCounters = new Map<string, number>()
 const builds = new Map<string, Entity>()
 const loot = new Map<string, Entity>()
@@ -1105,16 +1107,18 @@ function updateBots(dt: number) {
     }
 
     if (targetPosition) {
+      if(bot.family==='mutant' && bot.variant!=='king-mutant' && mutantWalkStates.get(bot.botId)===true){playMutantEmote(entity,bot.botId,'run');mutantWalkStates.set(bot.botId,false)}
       bot.targetId = targetId; bot.lastKnownX = targetPosition.x; bot.lastKnownZ = targetPosition.z; bot.lastSeenAt = now
       if (bot.aiState === 'patrol' || bot.aiState === 'return' || bot.aiState === 'search') { bot.aiState = 'alert'; bot.stateUntil = now + (bot.family === 'mutant' ? 120 : 450); setEnemyEye(bot.botId, 'alert'); if (bot.family === 'drone' && players.has(targetId)) scheduleBackup(bot, now) }
     } else if (bot.targetId && now - bot.lastSeenAt < 9000) {
+      if(bot.family==='mutant' && bot.variant!=='king-mutant' && mutantWalkStates.get(bot.botId)===true){playMutantEmote(entity,bot.botId,'run');mutantWalkStates.set(bot.botId,false)}
       targetPosition = Vector3.create(bot.lastKnownX, transform.position.y, bot.lastKnownZ); targetDistance = Vector3.distance(transform.position, targetPosition); bot.aiState = 'search'
     } else {
       bot.targetId = ''
       const phase = (now / (bot.variant === 'king-mutant' ? 1250 : 1450) + Number(bot.botId.replace(/\D/g, ''))) % (Math.PI * 2)
       const patrolRadius = bot.variant === 'king-mutant' ? 18 : bot.family === 'mutant' ? 90 : 10
       const patrolTarget = Vector3.create(bot.homeX + Math.sin(phase) * patrolRadius, bot.airborne ? 7 + Math.sin(phase * 1.7) * 2 : transform.position.y, bot.homeZ + Math.cos(phase) * patrolRadius)
-      bot.aiState = Vector3.distance(transform.position, patrolTarget) < 2 ? 'idle' : 'patrol'; if(bot.variant==='king-mutant')playKingAnimation(entity,bot.botId,bot.aiState==='idle'?'Idle':'Walk'); setEnemyEye(bot.botId, bot.aiState)
+      bot.aiState = Vector3.distance(transform.position, patrolTarget) < 2 ? 'idle' : 'patrol'; if(bot.family==='mutant' && bot.variant!=='king-mutant' && mutantWalkStates.get(bot.botId)!==true){playMutantEmote(entity,bot.botId,ZOMBIE_WALK_EMOTE);mutantWalkStates.set(bot.botId,true)} if(bot.variant==='king-mutant')playKingAnimation(entity,bot.botId,bot.aiState==='idle'?'Idle':'Walk'); setEnemyEye(bot.botId, bot.aiState)
       moveEnemy(entity, transform, patrolTarget, bot.speed * (bot.family === 'mutant' ? 0.58 : 0.35), dt, bot.airborne)
       continue
     }
