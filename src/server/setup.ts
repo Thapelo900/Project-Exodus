@@ -535,7 +535,7 @@ function spawnBot(index: number, forcedVariant?: EnemyVariant, missionNumber = 1
     position=Vector3.create(zone.x+(seedX*2-1)*Math.max(3,land.halfWidth-1.8),1.55,zone.z+(seedZ*2-1)*Math.max(3,land.halfDepth-1.8))
   }
   const entity=engine.addEntity();Transform.create(entity,{position,scale:variant==='king-mutant'?Vector3.create(10.0,10.0,10.0):Vector3.One()});MeshCollider.setBox(entity,ColliderLayer.CL_POINTER)
-  BotState.create(entity,{botId,displayName:def.name,hp:def.hp,active:true,targetId:'',family:def.family,variant,aiState:'patrol',maxHp:def.hp,damage:Math.round(def.damage*DIFFICULTY[difficulty].damage),speed:def.speed*DIFFICULTY[difficulty].speed,detection:def.detection*DIFFICULTY[difficulty].detection,homeX:position.x,homeZ:position.z,lastKnownX:position.x,lastKnownZ:position.z,lastSeenAt:0,stateUntil:0,attackReadyAt:0,reinforcementLevel:0,airborne:def.family==='drone'})
+  BotState.create(entity,{botId,displayName:def.name,hp:def.hp,active:true,targetId:'',family:def.family,variant,aiState:'patrol',maxHp:def.hp,damage:Math.round(def.damage*DIFFICULTY[difficulty].damage),speed:def.speed*DIFFICULTY[difficulty].speed*3,detection:def.detection*DIFFICULTY[difficulty].detection,homeX:position.x,homeZ:position.z,lastKnownX:position.x,lastKnownZ:position.z,lastSeenAt:0,stateUntil:0,attackReadyAt:0,reinforcementLevel:0,airborne:def.family==='drone'})
   if(def.family==='mutant'){
     buildMutantAvatar(botId,entity,variant)
     Raycast.create(entity,{originOffset:Vector3.create(0,.7,0),direction:{ $case:'globalDirection',globalDirection:Vector3.Forward()},maxDistance:1.4,queryType:RaycastQueryType.RQT_HIT_FIRST,timestamp:Date.now()})
@@ -785,12 +785,8 @@ function updateProjectiles(dt: number) {
         engine.removeEntity(entity); projectiles.delete(entity)
       }
     } else {
-      const targetEntity = bots.get(projectile.targetId)
-      const target = targetEntity ? Transform.getOrNull(targetEntity) : undefined
-      if (target && Vector3.distance(transform.position, target.position) < 1.4) {
-        applyDamageToBot(targetEntity!, projectile.damage, 'enemy-faction')
-        engine.removeEntity(entity); projectiles.delete(entity)
-      }
+      // Discard legacy enemy-targeted projectiles without causing friendly fire.
+      engine.removeEntity(entity); projectiles.delete(entity)
     }
   }
 }
@@ -959,7 +955,7 @@ function collectNearbyLoot() {
     for (const [address, playerEntity] of players) {
       const player = PlayerState.getMutableOrNull(playerEntity)
       const position = getPlayerPosition(address)
-      if (!player?.joined || !player.alive || !position || Vector3.distance(position, lootTransform.position) > 2) continue
+      if (!player?.joined || !player.alive || !position || Math.hypot(position.x-lootTransform.position.x, position.z-lootTransform.position.z) > 3.4) continue
       if (lootState.kind === 'life-credit') player.lifeCredits += lootState.amount
       else if (lootState.kind === 'materials' || lootState.kind === 'contaminated-material' || lootState.kind === 'electronic-component') player.materials += lootState.amount
       else if (lootState.kind === 'ammo-shotgun') player.ammoShotgun += lootState.amount
@@ -1031,9 +1027,12 @@ function moveEnemy(entity:Entity, transform: ReturnType<typeof Transform.getMuta
   const nav=!airborne&&state.variant==='king-mutant'?mutantNavigationTarget(transform.position,rawTarget):rawTarget
   const desired = Vector3.create(nav.x, airborne ? target.y : transform.position.y, nav.z)
   const direction = Vector3.normalize(Vector3.subtract(desired, transform.position))
-  const step=speed*dt
+  const step=speed*Math.min(dt,0.05)
   let next = Vector3.add(transform.position, Vector3.scale(direction, step))
-  if(!airborne) next=mutantPhysicsStep(entity,transform.position,direction,step)
+  if(!airborne) {
+    next=mutantPhysicsStep(entity,transform.position,direction,step)
+    if(!isOnMutantIslandGround(next)&&!isOnMutantBridge(next)) next=Vector3.clone(transform.position)
+  }
   if (!airborne && state.variant==='king-mutant') {
     // King Mutant is a territorial island guard: it may patrol/chase/shoot, but never leaves its spawn island.
     const home=MUTANT_ISLAND_GROUND.reduce((best,z)=>Math.hypot(state.homeX-z.x,state.homeZ-z.z)<Math.hypot(state.homeX-best.x,state.homeZ-best.z)?z:best,MUTANT_ISLAND_GROUND[0])
@@ -1099,12 +1098,7 @@ function updateBots(dt: number) {
       const seen = distance <= bot.detection * (bot.family === 'mutant' ? 1.35 : 1)
       if ((seen || heard) && distance < targetDistance) { targetId = address; targetPosition = position; targetDistance = distance }
     }
-    // Mutants and drones are rival factions and can become each other's target.
-    if (!targetPosition) for (const [otherEntity, other, otherTransform] of engine.getEntitiesWith(BotState, Transform)) {
-      if (otherEntity === entity || !other.active || other.family === bot.family) continue
-      const distance = Vector3.distance(transform.position, otherTransform.position)
-      if (distance < Math.min(bot.detection * 0.6, targetDistance)) { targetId = other.botId; targetPosition = otherTransform.position; targetDistance = distance }
-    }
+    // Hostile NPCs acquire living players only; never another hostile.
 
     if (targetPosition) {
       if(bot.family==='mutant' && bot.variant!=='king-mutant' && mutantWalkStates.get(bot.botId)===true){playMutantEmote(entity,bot.botId,'run');mutantWalkStates.set(bot.botId,false)}
@@ -1137,7 +1131,7 @@ function updateBots(dt: number) {
         moveEnemy(entity, transform, targetPosition, bot.speed * (bot.variant==='king-mutant'?1.45:1), dt, false, Math.cos(formationAngle)*formationRadius, Math.sin(formationAngle)*formationRadius, false)
       }
       if (now >= bot.attackReadyAt) {
-        bot.attackReadyAt = now + (bot.variant === 'berserker-mutant' ? 1700 : bot.family === 'drone' ? 1650 : bot.variant === 'king-mutant' ? 1535 : 1150)
+        bot.attackReadyAt = now + Math.round((bot.variant === 'berserker-mutant' ? 1700 : bot.family === 'drone' ? 1650 : bot.variant === 'king-mutant' ? 1535 : 1150)/3)
         if (bot.family === 'mutant' && bot.variant !== 'king-mutant' && bot.variant in MUTANT_AVATARS) playMutantEmote(entity, bot.botId, MUTANT_AVATARS[bot.variant as keyof typeof MUTANT_AVATARS].attackEmote)
         if (ranged) {
           transform.rotation=Quaternion.lookRotation(Vector3.normalize(Vector3.subtract(targetPosition,transform.position)))
@@ -1146,7 +1140,7 @@ function updateBots(dt: number) {
           createEnemyProjectile(Vector3.create(transform.position.x, transform.position.y + (bot.family === 'drone' ? -.2 : 1.5), transform.position.z), targetId, projectileDamage, bot.variant==='king-mutant')
         }
         else if (players.has(targetId)) applyDamageToPlayer(targetId, Math.max(1,Math.round(bot.damage*.45)), bot.botId)
-        else { const rival = bots.get(targetId); if (rival) applyDamageToBot(rival, bot.damage, bot.botId) }
+        // Hostile NPCs cannot damage other hostiles.
       }
     } else if (targetPosition) {
       bot.aiState = 'chase'; if(bot.variant==='king-mutant')playKingAnimation(entity,bot.botId,'Walk'); setEnemyEye(bot.botId, 'chase')
