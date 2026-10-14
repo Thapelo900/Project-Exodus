@@ -172,6 +172,7 @@ const lastSurvivalPositions = new Map<string, Vector3>()
 let matchEntity: Entity
 let botTick = 0
 let worldTick = 0
+let pickupTick = 0
 let heartbeatTick = 0
 let survivalTick = 0
 let nextBuildId = 1
@@ -788,7 +789,7 @@ function updateProjectiles(dt: number) {
     }
     if (players.has(projectile.targetId)) {
       const target = getPlayerPosition(projectile.targetId)
-      if (target && Vector3.distance(transform.position, Vector3.create(target.x, target.y + 0.8, target.z)) < 1.25) {
+      if (target && Vector3.distance(transform.position, Vector3.create(target.x, target.y + 0.8, target.z)) < 1.8) {
         applyDamageToPlayer(projectile.targetId, projectile.damage, 'enemy-projectile')
         spawnImpactFx(transform.position,projectile.toxic,projectile.damage)
         engine.removeEntity(entity); projectiles.delete(entity)
@@ -825,8 +826,9 @@ function handleFire(address: string, directionX: number, directionY: number, dir
 
   for (const [entity, bot, transform] of engine.getEntitiesWith(BotState, Transform)) {
     if (!bot.active || isInsideOutpost(transform.position)) continue
-    const test = pointToRayDistance(origin, direction, transform.position)
-    if (test.distanceAlongRay <= effectiveRange && test.miss <= 1.2 && test.distanceAlongRay < closestDistance) {
+    const aimCenter=Vector3.create(transform.position.x,transform.position.y+(bot.family==='mutant'?1.25:0),transform.position.z)
+    const test = pointToRayDistance(origin, direction, aimCenter)
+    if (test.distanceAlongRay <= effectiveRange && test.miss <= (bot.variant==='king-mutant'?3:bot.family==='mutant'?1.9:1.6) && test.distanceAlongRay < closestDistance) {
       closestDistance = test.distanceAlongRay
       hitBot = entity
       hitPlayer = undefined
@@ -964,7 +966,7 @@ function collectNearbyLoot() {
     for (const [address, playerEntity] of players) {
       const player = PlayerState.getMutableOrNull(playerEntity)
       const position = getPlayerPosition(address)
-      if (!player?.joined || !player.alive || !position || Math.hypot(position.x-lootTransform.position.x, position.z-lootTransform.position.z) > 3.4) continue
+      if (!player?.joined || !player.alive || !position || Math.hypot(position.x-lootTransform.position.x, position.z-lootTransform.position.z) > 4.5) continue
       if (lootState.kind === 'life-credit') player.lifeCredits += lootState.amount
       else if (lootState.kind === 'materials' || lootState.kind === 'contaminated-material' || lootState.kind === 'electronic-component') player.materials += lootState.amount
       else if (lootState.kind === 'ammo-shotgun') player.ammoShotgun += lootState.amount
@@ -1036,10 +1038,11 @@ function moveEnemy(entity:Entity, transform: ReturnType<typeof Transform.getMuta
   const nav=!airborne&&state.variant==='king-mutant'?mutantNavigationTarget(transform.position,rawTarget):rawTarget
   const desired = Vector3.create(nav.x, airborne ? target.y : transform.position.y, nav.z)
   const direction = Vector3.normalize(Vector3.subtract(desired, transform.position))
-  const step=speed*Math.min(dt,0.05)
+  const step=Math.min(speed*Math.min(dt,0.25),0.32)
   let next = Vector3.add(transform.position, Vector3.scale(direction, step))
   if(!airborne) {
-    next=mutantPhysicsStep(entity,transform.position,direction,step)
+    const corridorStep=Vector3.add(transform.position,Vector3.scale(direction,Math.min(step,.12)))
+    next=isOnMutantBridge(transform.position)&&isOnMutantBridge(corridorStep)?corridorStep:mutantPhysicsStep(entity,transform.position,direction,step)
     if(!isOnMutantIslandGround(next)&&!isOnMutantBridge(next)) next=Vector3.clone(transform.position)
   }
   if (!airborne && state.variant==='king-mutant') {
@@ -1101,7 +1104,7 @@ function updateBots(dt: number) {
     for (const [address, playerEntity] of players) {
       const player = PlayerState.getOrNull(playerEntity), position = getPlayerPosition(address)
       if (!player?.joined || !player.alive || !position || isInsideOutpost(position)) continue
-      const distance = Vector3.distance(transform.position, position)
+      const distance = Math.hypot(transform.position.x-position.x,transform.position.z-position.z)
       const noise = playerNoise.get(address)
       const heard = !!noise && noise.until > now && Vector3.distance(transform.position, Vector3.create(noise.x, transform.position.y, noise.z)) <= noise.radius
       const seen = distance <= bot.detection * (bot.family === 'mutant' ? 1.35 : 1)
@@ -1115,7 +1118,7 @@ function updateBots(dt: number) {
       if (bot.aiState === 'patrol' || bot.aiState === 'return' || bot.aiState === 'search') { bot.aiState = 'alert'; bot.stateUntil = now + (bot.family === 'mutant' ? 120 : 450); setEnemyEye(bot.botId, 'alert'); if (bot.family === 'drone' && players.has(targetId)) scheduleBackup(bot, now) }
     } else if (bot.targetId && now - bot.lastSeenAt < 9000) {
       if(bot.family==='mutant' && bot.variant!=='king-mutant' && mutantWalkStates.get(bot.botId)===true){playMutantEmote(entity,bot.botId,'run');mutantWalkStates.set(bot.botId,false)}
-      targetPosition = Vector3.create(bot.lastKnownX, transform.position.y, bot.lastKnownZ); targetDistance = Vector3.distance(transform.position, targetPosition); bot.aiState = 'search'
+      targetPosition = Vector3.create(bot.lastKnownX, transform.position.y, bot.lastKnownZ); targetDistance = Math.hypot(transform.position.x-targetPosition.x,transform.position.z-targetPosition.z); bot.aiState = 'search'
     } else {
       bot.targetId = ''
       const phase = (now / (bot.variant === 'king-mutant' ? 1250 : 1450) + Number(bot.botId.replace(/\D/g, ''))) % (Math.PI * 2)
@@ -1180,7 +1183,7 @@ function updateBots(dt: number) {
       bot.aiState = 'chase'; if(bot.variant==='king-mutant')playKingAnimation(entity,bot.botId,'Walk'); setEnemyEye(bot.botId, 'chase')
       let offsetX = 0, offsetZ = 0
       
-      if (bot.family === 'drone') { const n=Number(bot.botId.replace(/\D/g,''))||entity, angle=(n*2.399963229728653)+(now/5000), radius=16+(n%9)*3.2; offsetX=Math.cos(angle)*radius; offsetZ=Math.sin(angle)*radius; targetPosition=Vector3.create(targetPosition.x,7+(n%5)*.8+Math.sin(now/1100+n)*1.2,targetPosition.z) }
+      if (bot.family === 'drone') { const n=Number(bot.botId.replace(/\D/g,''))||entity, angle=(n*2.399963229728653)+(now/5000), radius=3+(n%4)*.7; offsetX=targetDistance>12?0:Math.cos(angle)*radius; offsetZ=targetDistance>12?0:Math.sin(angle)*radius; targetPosition=Vector3.create(targetPosition.x,7+(n%5)*.8+Math.sin(now/1100+n)*1.2,targetPosition.z) }
       if(bot.family==='mutant'&&bot.variant==='king-mutant'){const n=Number(bot.botId.replace(/\D/g,''))||entity,angle=(n%8)*(Math.PI/4),radius=1.8;offsetX+=Math.cos(angle)*radius;offsetZ+=Math.sin(angle)*radius}
       moveEnemy(entity, transform, targetPosition, bot.speed * (bot.family==='mutant' ? (bot.variant==='berserker-mutant'?1.15:bot.variant==='king-mutant'?1.45:1) : 1), dt, bot.airborne, offsetX, offsetZ, false)
       if(bot.family==='mutant'&&players.has(targetId))faceGroundEnemyToPlayer(transform,targetPosition)
@@ -1220,6 +1223,10 @@ function applyStormDamage() {
 function serverSystem(dt: number) {
   const now = Date.now()
   updateBombs(dt)
+  // Pickups must continue processing while the player is present, even if a round
+  // phase transition has stopped combat systems. LootState.active prevents repeats.
+  pickupTick += dt
+  if (pickupTick >= 0.2) { pickupTick = 0; collectNearbyLoot() }
   heartbeatTick += dt
   if (heartbeatTick >= 2) {
     heartbeatTick = 0
@@ -1287,7 +1294,6 @@ function serverSystem(dt: number) {
   }
   worldTick += dt
   if (state.phase === 'active' && worldTick >= 1) {
-    collectNearbyLoot()
     // v63: storm no longer damages the player; only hostile attacks/contact reduce health.
     // applyStormDamage()
     for (const [address, entity] of players) {
