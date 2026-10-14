@@ -17,6 +17,7 @@ import {
   isInsideCombatLand,
   mutantNavigationTarget,
   isOnMutantBridge,
+  isOnMutantIslandGround,
   MUTANT_ISLAND_GROUND,
   mutantSurfaceY,
   MUTANT_AVATARS,
