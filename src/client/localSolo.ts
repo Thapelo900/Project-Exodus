@@ -267,7 +267,8 @@ export function fireLocalWeapon(direction: Vector3) {
     const bot = BotState.getOrNull(entity)
     const transform = Transform.getOrNull(entity)
     if (!bot?.active || !transform) continue
-    const test = pointToRayDistance(origin, direction, transform.position)
+    const aimCenter=Vector3.create(transform.position.x,transform.position.y+(bot.family==='mutant'?1.25:0),transform.position.z)
+    const test = pointToRayDistance(origin, direction, aimCenter)
     if (test.along <= effectiveRange && test.miss <= (bot?.variant==='king-mutant'?5.0:bot?.family==='drone'?1.8:1.65) && test.along < closestDistance) {
       closest = entity
       closestDistance = test.along
@@ -455,7 +456,7 @@ function collectLoot(player: ReturnType<typeof PlayerState.getMutable>, playerPo
   for (const entity of lootEntities) {
     const loot = LootState.getMutableOrNull(entity)
     const transform = Transform.getOrNull(entity)
-    if (!loot?.active || !transform || Math.hypot(playerPosition.x-transform.position.x, playerPosition.z-transform.position.z) > 3.6) continue
+    if (!loot?.active || !transform || Math.hypot(playerPosition.x-transform.position.x, playerPosition.z-transform.position.z) > 4.5) continue
     if (loot.kind === 'life-credit') player.lifeCredits += loot.amount
     else if (loot.kind === 'materials') player.materials += loot.amount
     else if (loot.kind === 'ammo-shotgun') player.ammoShotgun += loot.amount
@@ -506,7 +507,7 @@ function spawnLocalImpact(position:Vector3,toxic:boolean,damage:number){
 }
 function updateLocalImpactFx(player:ReturnType<typeof PlayerState.getMutable>,playerPosition:Vector3){const now=Date.now();for(const[e,fx]of localImpactFx){const t=Transform.getMutableOrNull(e);if(!t||now>=fx.expiresAt){engine.removeEntity(e);localImpactFx.delete(e);continue}}}
 
-function updateLocalProjectiles(dt:number,player:ReturnType<typeof PlayerState.getMutable>,playerPosition:Vector3){const now=Date.now();for(const[entity,p]of localProjectiles){const t=Transform.getMutableOrNull(entity);if(!t||now>=p.expiresAt){if(t)spawnLocalImpact(t.position,p.toxic,p.damage);engine.removeEntity(entity);localProjectiles.delete(entity);continue}Raycast.getMutable(entity).timestamp=now;const hit=RaycastResult.getOrNull(entity)?.hits?.[0];if(hit&&hit.length<=1.25){spawnLocalImpact(t.position,p.toxic,p.damage);engine.removeEntity(entity);localProjectiles.delete(entity);continue}t.position=Vector3.add(t.position,Vector3.scale(p.velocity,dt));if(isInsideOutpost(t.position)){engine.removeEntity(entity);localProjectiles.delete(entity);continue}if(Vector3.distance(t.position,Vector3.create(playerPosition.x,playerPosition.y+1,playerPosition.z))<1.25){damageLocalPlayer(player,p.damage);spawnLocalImpact(t.position,p.toxic,p.damage);engine.removeEntity(entity);localProjectiles.delete(entity)}}updateLocalImpactFx(player,playerPosition)}
+function updateLocalProjectiles(dt:number,player:ReturnType<typeof PlayerState.getMutable>,playerPosition:Vector3){const now=Date.now();for(const[entity,p]of localProjectiles){const t=Transform.getMutableOrNull(entity);if(!t||now>=p.expiresAt){if(t)spawnLocalImpact(t.position,p.toxic,p.damage);engine.removeEntity(entity);localProjectiles.delete(entity);continue}Raycast.getMutable(entity).timestamp=now;const hit=RaycastResult.getOrNull(entity)?.hits?.[0];if(hit&&hit.length<=1.25){spawnLocalImpact(t.position,p.toxic,p.damage);engine.removeEntity(entity);localProjectiles.delete(entity);continue}t.position=Vector3.add(t.position,Vector3.scale(p.velocity,dt));if(isInsideOutpost(t.position)){engine.removeEntity(entity);localProjectiles.delete(entity);continue}if(Vector3.distance(t.position,Vector3.create(playerPosition.x,playerPosition.y+1,playerPosition.z))<1.8){damageLocalPlayer(player,p.damage);spawnLocalImpact(t.position,p.toxic,p.damage);engine.removeEntity(entity);localProjectiles.delete(entity)}}updateLocalImpactFx(player,playerPosition)}
 
 // v110: three-probe solid-world navigation. NPC transforms do not physically collide
 // with GLB colliders in Decentraland, so Mutants must query the PHYSICS world before moving.
@@ -555,6 +556,8 @@ function mutantSafeStep(entity:Entity,position:Vector3,direction:Vector3,step:nu
   // Results belong to the rays aimed on the previous frame. Movement is only allowed when
   // that probe reports clear; then immediately queue the next three world-physics queries.
   const fb=probeBlocked(p.f,max),lb=probeBlocked(p.l,max),rb=probeBlocked(p.r,max),flb=probeBlocked(p.fl,max),frb=probeBlocked(p.fr,max),now=Date.now()
+  const bridgeNext=Vector3.add(position,Vector3.scale(flat,Math.min(step,.12)))
+  if(isOnMutantBridge(position)&&isOnMutantBridge(bridgeNext)){aimProbe(p.f,position,flat,max);aimProbe(p.l,position,left,max);aimProbe(p.r,position,right,max);aimProbe(p.fl,position,flat,max);aimProbe(p.fr,position,flat,max);mutantWallAvoid.delete(entity);return bridgeNext}
   // Body-width probes catch GLB corners that a single center ray misses. This keeps the
   // Mutant/King capsule outside authored walls instead of allowing shoulders/body to clip through.
   const fLeft=Vector3.normalize(Vector3.add(Vector3.scale(flat,.88),Vector3.scale(left,.48)))
@@ -601,7 +604,7 @@ function updateBots(dt: number, player: ReturnType<typeof PlayerState.getMutable
       transform.position=Vector3.create(OUTPOST_ZONE.centerX+direction.x*(OUTPOST_ZONE.halfWidth+2),bot.airborne?7:mutantSurfaceY({x:transform.position.x,z:transform.position.z}),OUTPOST_ZONE.centerZ+direction.z*(OUTPOST_ZONE.halfDepth+2))
       bot.targetId='';bot.aiState='return'
     }
-    const distance = Vector3.distance(transform.position, playerPosition), range=bot.family==='mutant'&&bot.variant!=='king-mutant'?2.15:ENEMIES[bot.variant as EnemyVariant].range
+    const distance = Math.hypot(transform.position.x-playerPosition.x,transform.position.z-playerPosition.z), range=bot.family==='mutant'&&bot.variant!=='king-mutant'?2.15:ENEMIES[bot.variant as EnemyVariant].range
     if(bot.variant==='king-mutant'){const maxHp=ENEMIES['king-mutant'].hp;if(bot.hp>0&&bot.hp<maxHp)bot.hp=Math.min(maxHp,bot.hp+dt*.45)}
     const acquired=bot.family==='mutant'&&botHasSeenPlayer.get(bot.botId)===true
     const kingPlayerOnHome=bot.variant!=='king-mutant'||sameKingIsland(bot,playerPosition)
@@ -643,7 +646,7 @@ function updateBots(dt: number, player: ReturnType<typeof PlayerState.getMutable
       bot.aiState='chase'
       if(bot.variant==='king-mutant')playLocalKingAnimation(bot.botId,'Walk')
       let target=Vector3.clone(playerPosition)
-      if(bot.family==='drone'){const angle=entity*2.399963229728653+now/5000,radius=16+(entity%9)*3.2;target=Vector3.create(playerPosition.x+Math.cos(angle)*radius,7+(entity%5)*.8+Math.sin(now/1100+entity)*1.2,playerPosition.z+Math.sin(angle)*radius)}
+      if(bot.family==='drone'){const angle=entity*2.399963229728653+now/5000,radius=3+(entity%4)*.7;target=Vector3.create(playerPosition.x+Math.cos(angle)*radius,7+(entity%5)*.8+Math.sin(now/1100+entity)*1.2,playerPosition.z+Math.sin(angle)*radius)}
       
       if(bot.family==='mutant'){if(bot.variant==='king-mutant'){const n=entity,angle=now/780+n*1.73,radius=Math.min(7,Math.max(3.4,distance*.22));target=Vector3.create(target.x+Math.cos(angle)*radius,target.y,target.z+Math.sin(angle)*radius);target=Vector3.create(target.x,transform.position.y,target.z)}else{const flankAngle=now/2100+entity*2.17,flankRadius=1.4+(entity%4)*.55;target=Vector3.create(playerPosition.x+Math.cos(flankAngle)*flankRadius,transform.position.y,playerPosition.z+Math.sin(flankAngle)*flankRadius)}}
       const direction = Vector3.normalize(Vector3.subtract(target, transform.position))
@@ -667,7 +670,7 @@ function updateBots(dt: number, player: ReturnType<typeof PlayerState.getMutable
       }
       if(bot.family==='mutant')faceLocalMutantToPlayer(transform,playerPosition)
       const hasLos=enemyHasLineOfSight(entity,transform.position,playerPosition)
-      if(!hasLos){bot.aiState='chase';continue}
+      if(!hasLos&&distance>3.0){bot.aiState='chase';continue}
       if (now - (botLastShotAt.get(bot.botId) ?? 0) > ((bot.family==='drone'?1650:bot.variant==='king-mutant'?1535:1350)/3)) {
         bot.aiState='attack'
         if(bot.variant==='king-mutant'){const flip=!(kingAttackFlip.get(bot.botId)??false);kingAttackFlip.set(bot.botId,flip);playLocalKingAnimation(bot.botId,flip?'Attack 1':'Attack 2',true)}
@@ -691,6 +694,9 @@ function localSoloSystem(dt: number) {
   if (!matchEntity || !playerEntity) return
   const match = MatchState.getMutable(matchEntity)
   const player = PlayerState.getMutable(playerEntity)
+  // Pickup collection must not be disabled by an unexpected match phase transition.
+  const pickupTransform = Transform.getOrNull(engine.PlayerEntity)
+  if (player.alive && pickupTransform && !clientState.memoryStoryOpen && !clientState.dataStoryOpen) collectLoot(player, pickupTransform.position)
   if (match.phase !== 'active') return
   // Story pickups pause solo simulation completely until the player closes the popup.
   if (clientState.memoryStoryOpen || clientState.dataStoryOpen) return
@@ -743,7 +749,6 @@ function localSoloSystem(dt: number) {
   player.stamina = travelled > 2 ? Math.max(0, player.stamina - 4) : Math.min(100, player.stamina + 3)
   previousSurvivalPosition = Vector3.clone(playerTransform.position)
   worldTick = 0
-  collectLoot(player, playerTransform.position)
   const center = Vector3.create(GAME.centerX, playerTransform.position.y, GAME.centerZ)
   // v63: zone/storm is visual/gameplay pressure only; it does not reduce player health.
 }
