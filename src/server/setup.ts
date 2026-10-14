@@ -144,6 +144,13 @@ const playerNoise = new Map<string, { x: number; z: number; radius: number; unti
 const backupCalls = new Map<string, number>()
 const kingAnimationState = new Map<string,string>()
 const kingAttackFlip = new Map<string,boolean>()
+const kingChargeReadyAt = new Map<string,number>()
+const kingChargeUntil = new Map<string,number>()
+const kingChargeHit = new Set<string>()
+function faceGroundEnemyToPlayer(transform:ReturnType<typeof Transform.getMutable>,target:Vector3){
+  const toward=Vector3.create(target.x-transform.position.x,0,target.z-transform.position.z)
+  if(Vector3.length(toward)>.01)transform.rotation=Quaternion.lookRotation(Vector3.normalize(toward))
+}
 
 function playKingAnimation(entity:Entity, botId:string, clip:string, force=false){
   if(!force&&kingAnimationState.get(botId)===clip)return
@@ -410,6 +417,7 @@ function removeDynamicEntities() {
   enemyEyes.clear()
   projectiles.clear()
   backupCalls.clear()
+  kingChargeReadyAt.clear();kingChargeUntil.clear();kingChargeHit.clear()
   enemyEmoteCounters.clear()
   reinforcementsSpawned = 0
   builds.clear()
@@ -1121,8 +1129,31 @@ function updateBots(dt: number) {
     if (bot.stateUntil > now && bot.aiState === 'alert' && bot.family === 'drone') continue
     const range = bot.variant==='king-mutant'?12:(bot.family==='mutant'?2.15:(ENEMIES[bot.variant as EnemyVariant]?.range ?? 2))
     const ranged = bot.variant==='king-mutant' || bot.family === 'drone'
+    // Keep Mutants and Kings oriented toward their living target, regardless of flank/path direction.
+    if(targetPosition&&players.has(targetId)&&bot.family==='mutant')faceGroundEnemyToPlayer(transform,targetPosition)
+    if(bot.variant==='king-mutant'&&targetPosition&&players.has(targetId)&&targetDistance<=10){
+      if(now>=(kingChargeReadyAt.get(bot.botId)??0)&&targetDistance>2.3){
+        kingChargeReadyAt.set(bot.botId,now+6200)
+        kingChargeUntil.set(bot.botId,now+1300)
+        kingChargeHit.delete(bot.botId)
+        playKingAnimation(entity,bot.botId,'Walk',true)
+      }
+      if(now<(kingChargeUntil.get(bot.botId)??0)){
+        const before=Vector3.clone(transform.position)
+        moveEnemy(entity,transform,targetPosition,bot.speed*3.2,dt,false)
+        faceGroundEnemyToPlayer(transform,targetPosition)
+        const moved=Math.hypot(transform.position.x-before.x,transform.position.z-before.z)
+        const contact=Math.hypot(transform.position.x-targetPosition.x,transform.position.z-targetPosition.z)
+        if(contact<=2.25&&!kingChargeHit.has(bot.botId)&&moved>.01){
+          applyDamageToPlayer(targetId,Math.max(4,Math.round(bot.damage*1.3)),bot.botId)
+          kingChargeHit.add(bot.botId)
+          kingChargeUntil.set(bot.botId,0)
+        }
+        continue // Charge is an alternative attack, not an extra projectile on the same tick.
+      }
+    }
     if (targetPosition && targetDistance <= range) {
-      bot.aiState = 'attack'; if(bot.variant==='king-mutant'){const flip=!(kingAttackFlip.get(bot.botId)??false);kingAttackFlip.set(bot.botId,flip);playKingAnimation(entity,bot.botId,flip?'Attack 1':'Attack 2',true)}; setEnemyEye(bot.botId, 'attack', bot.family === 'drone' && bot.hp < bot.maxHp * .3)
+      bot.aiState = 'attack'; if(bot.family==='mutant'&&targetPosition)faceGroundEnemyToPlayer(transform,targetPosition); if(bot.variant==='king-mutant'){const flip=!(kingAttackFlip.get(bot.botId)??false);kingAttackFlip.set(bot.botId,flip);playKingAnimation(entity,bot.botId,flip?'Attack 1':'Attack 2',true)}; setEnemyEye(bot.botId, 'attack', bot.family === 'drone' && bot.hp < bot.maxHp * .3)
       // v79: Kings are island guards, not stationary turrets. Keep closing on the player while firing.
       // Navigation still goes through moveEnemy, so bridge/land constraints and solid-GLB avoidance remain active.
       if (bot.family === 'mutant' && players.has(targetId) && targetDistance > 1.35) {
@@ -1130,12 +1161,14 @@ function updateBots(dt: number) {
         // Ranged mutants/Kings keep advancing while firing; melee mutants close to striking distance.
         const n=Number(bot.botId.replace(/\D/g,''))||entity, formationAngle=(n%8)*(Math.PI/4), formationRadius=bot.variant==='king-mutant'?1.8:0
         moveEnemy(entity, transform, targetPosition, bot.speed * (bot.variant==='king-mutant'?1.45:1), dt, false, Math.cos(formationAngle)*formationRadius, Math.sin(formationAngle)*formationRadius, false)
+        faceGroundEnemyToPlayer(transform,targetPosition)
       }
       if (now >= bot.attackReadyAt) {
         bot.attackReadyAt = now + Math.round((bot.variant === 'berserker-mutant' ? 1700 : bot.family === 'drone' ? 1650 : bot.variant === 'king-mutant' ? 1535 : 1150)/3)
         if (bot.family === 'mutant' && bot.variant !== 'king-mutant' && bot.variant in MUTANT_AVATARS) playMutantEmote(entity, bot.botId, MUTANT_AVATARS[bot.variant as keyof typeof MUTANT_AVATARS].attackEmote)
         if (ranged) {
-          transform.rotation=Quaternion.lookRotation(Vector3.normalize(Vector3.subtract(targetPosition,transform.position)))
+          if(bot.family==='mutant')faceGroundEnemyToPlayer(transform,targetPosition)
+          else transform.rotation=Quaternion.lookRotation(Vector3.normalize(Vector3.subtract(targetPosition,transform.position)))
           // Only the King Mutant has mutant bullets. Its projectile damage matches an Attack Drone projectile.
           const projectileDamage=bot.variant==='king-mutant'?ENEMIES['attack-drone'].damage:bot.damage
           createEnemyProjectile(Vector3.create(transform.position.x, transform.position.y + (bot.family === 'drone' ? -.2 : 1.5), transform.position.z), targetId, projectileDamage, bot.variant==='king-mutant')
@@ -1150,6 +1183,7 @@ function updateBots(dt: number) {
       if (bot.family === 'drone') { const n=Number(bot.botId.replace(/\D/g,''))||entity, angle=(n*2.399963229728653)+(now/5000), radius=16+(n%9)*3.2; offsetX=Math.cos(angle)*radius; offsetZ=Math.sin(angle)*radius; targetPosition=Vector3.create(targetPosition.x,7+(n%5)*.8+Math.sin(now/1100+n)*1.2,targetPosition.z) }
       if(bot.family==='mutant'&&bot.variant==='king-mutant'){const n=Number(bot.botId.replace(/\D/g,''))||entity,angle=(n%8)*(Math.PI/4),radius=1.8;offsetX+=Math.cos(angle)*radius;offsetZ+=Math.sin(angle)*radius}
       moveEnemy(entity, transform, targetPosition, bot.speed * (bot.family==='mutant' ? (bot.variant==='berserker-mutant'?1.15:bot.variant==='king-mutant'?1.45:1) : 1), dt, bot.airborne, offsetX, offsetZ, false)
+      if(bot.family==='mutant'&&players.has(targetId))faceGroundEnemyToPlayer(transform,targetPosition)
     }
   }
   for (const [address, noise] of playerNoise) if (noise.until <= now) playerNoise.delete(address)
