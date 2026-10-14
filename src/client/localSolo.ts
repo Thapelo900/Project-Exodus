@@ -163,7 +163,7 @@ function makeBot(index: number, forcedVariant?:EnemyVariant, missionNumber=1, sp
   }
   Transform.create(entity, { position, scale: variant==='king-mutant'?Vector3.create(10.0,10.0,10.0):Vector3.One() })
   MeshCollider.setBox(entity, ColliderLayer.CL_POINTER)
-  BotState.create(entity, { botId, displayName:def.name,hp:def.hp,active:true,targetId:'',family:def.family,variant,aiState:'patrol',maxHp:def.hp,damage:Math.round(def.damage*DIFFICULTY[localDifficulty].damage),speed:def.speed*DIFFICULTY[localDifficulty].speed,detection:def.detection*DIFFICULTY[localDifficulty].detection,homeX:position.x,homeZ:position.z,lastKnownX:position.x,lastKnownZ:position.z,lastSeenAt:0,stateUntil:0,attackReadyAt:0,reinforcementLevel:0,airborne:def.family==='drone'})
+  BotState.create(entity, { botId, displayName:def.name,hp:def.hp,active:true,targetId:'',family:def.family,variant,aiState:'patrol',maxHp:def.hp,damage:Math.round(def.damage*DIFFICULTY[localDifficulty].damage),speed:def.speed*DIFFICULTY[localDifficulty].speed*3,detection:def.detection*DIFFICULTY[localDifficulty].detection,homeX:position.x,homeZ:position.z,lastKnownX:position.x,lastKnownZ:position.z,lastSeenAt:0,stateUntil:0,attackReadyAt:0,reinforcementLevel:0,airborne:def.family==='drone'})
   makeEnemyModel(botId,entity,variant)
   if(def.family==='mutant') Raycast.create(entity,{originOffset:Vector3.create(0,.7,0),direction:{ $case:'globalDirection',globalDirection:Vector3.Forward()},maxDistance:1.4,queryType:RaycastQueryType.RQT_HIT_FIRST,timestamp:Date.now()})
   botEntities.push(entity)
@@ -248,10 +248,10 @@ export function fireLocalWeapon(direction: Vector3) {
   const player = PlayerState.getMutable(playerEntity)
   const weapon = WEAPONS[player.equippedWeapon as WeaponId] ?? WEAPONS['pulse-rifle']
   if (player[weapon.magazineField] <= 0) return 'Magazine empty - reload'
-  player[weapon.magazineField] -= 1
   const playerTransform = Transform.getOrNull(engine.PlayerEntity)
-  if (!playerTransform) return 'Shot fired'
+  if (!playerTransform) return 'Player position unavailable'
   if (isInsideOutpost(playerTransform.position)) return 'Weapons are secured inside the Outpost'
+  player[weapon.magazineField] -= 1
   const origin = Vector3.create(playerTransform.position.x, playerTransform.position.y + 1.35, playerTransform.position.z)
   let closest: Entity | undefined
   const effectiveRange=Math.max(weapon.range,140)
@@ -448,7 +448,7 @@ function collectLoot(player: ReturnType<typeof PlayerState.getMutable>, playerPo
   for (const entity of lootEntities) {
     const loot = LootState.getMutableOrNull(entity)
     const transform = Transform.getOrNull(entity)
-    if (!loot?.active || !transform || Vector3.distance(playerPosition, transform.position) > 3.6) continue
+    if (!loot?.active || !transform || Math.hypot(playerPosition.x-transform.position.x, playerPosition.z-transform.position.z) > 3.6) continue
     if (loot.kind === 'life-credit') player.lifeCredits += loot.amount
     else if (loot.kind === 'materials') player.materials += loot.amount
     else if (loot.kind === 'ammo-shotgun') player.ammoShotgun += loot.amount
@@ -564,17 +564,18 @@ function mutantSafeStep(entity:Entity,position:Vector3,direction:Vector3,step:nu
     const sideDir=avoid.side>0?left:right, sideBlocked=avoid.side>0?lb:rb
     if(sideBlocked){
       const otherBlocked=avoid.side>0?rb:lb
-      if(!otherBlocked){avoid.side=-avoid.side;mutantWallAvoid.set(entity,avoid);return Vector3.add(position,Vector3.scale(avoid.side>0?left:right,Math.min(step,.075)))}
+      if(!otherBlocked){avoid.side=-avoid.side;mutantWallAvoid.set(entity,avoid);const next=Vector3.add(position,Vector3.scale(avoid.side>0?left:right,Math.min(step,.075)));return mutantGroundAllowed(next)?next:Vector3.clone(position)}
       return Vector3.clone(position)
     }
     // Follow the wall until the forward probe has been clear for long enough.
     if(!bodyBlocked)avoid.until=Math.min(avoid.until,now+260)
-    return Vector3.add(position,Vector3.scale(sideDir,Math.min(step,.075)))
+    {const next=Vector3.add(position,Vector3.scale(sideDir,Math.min(step,.075)));return mutantGroundAllowed(next)?next:Vector3.clone(position)}
   }
   mutantWallAvoid.delete(entity)
   if(bodyBlocked)return Vector3.clone(position)
   // Limit each accepted ground step so fast Kings cannot tunnel through thin GLB colliders between probes.
-  return Vector3.add(position,Vector3.scale(flat,Math.min(step,.16)))
+  const candidate=Vector3.add(position,Vector3.scale(flat,Math.min(step,.16)))
+  return mutantGroundAllowed(candidate)?candidate:Vector3.clone(position)
 }
 
 function updateBots(dt: number, player: ReturnType<typeof PlayerState.getMutable>, playerPosition: Vector3) {
@@ -598,7 +599,7 @@ function updateBots(dt: number, player: ReturnType<typeof PlayerState.getMutable
     const acquired=bot.family==='mutant'&&botHasSeenPlayer.get(bot.botId)===true
     const kingPlayerOnHome=bot.variant!=='king-mutant'||sameKingIsland(bot,playerPosition)
     const detected=!playerSafe&&kingPlayerOnHome&&(acquired||distance<=bot.detection*(bot.family==='mutant'?1.35:1)||((bot.aiState==='alert'||bot.aiState==='chase'||bot.aiState==='attack')&&distance<=bot.detection*(bot.family==='mutant'?2.25:1.8)))
-    if(!detected){if(bot.variant==='king-mutant'&&!kingPlayerOnHome){botHasSeenPlayer.set(bot.botId,false);bot.targetId=''}bot.aiState='patrol';if(bot.family==='mutant'&&bot.variant!=='king-mutant'&&localMutantWalkStates.get(bot.botId)!==true){playLocalMutantEmote(entity,ZOMBIE_WALK_EMOTE);localMutantWalkStates.set(bot.botId,true)}if(bot.variant==='king-mutant')playLocalKingAnimation(bot.botId,'Walk');const phase=now/(bot.variant==='king-mutant'?1500:1450)+entity,patrolRadius=bot.variant==='king-mutant'?28:10,homeIsland=bot.variant==='king-mutant'?kingHomeIsland(bot):undefined,rawPatrol=bot.variant==='king-mutant'&&homeIsland?Vector3.create(homeIsland.x+Math.sin(phase+(Math.floor(now/6000)+entity)*1.37)*homeIsland.rx*(.28+((entity+Math.floor(now/6000))%4)*.055),transform.position.y,homeIsland.z+Math.cos(phase*.71+(Math.floor(now/6000)+entity)*.91)*homeIsland.rz*(.28+((entity+2+Math.floor(now/6000))%4)*.055)):Vector3.create(bot.homeX+Math.sin(phase)*patrolRadius,bot.airborne?7+Math.sin(phase)*2:transform.position.y,bot.homeZ+Math.cos(phase)*patrolRadius),patrolNav={x:rawPatrol.x,z:rawPatrol.z},target=Vector3.create(patrolNav.x,rawPatrol.y,patrolNav.z);const direction=Vector3.normalize(Vector3.subtract(target,transform.position));const patrolStep=bot.speed*(bot.family==='mutant'?1.05:.42)*dt;let next=bot.family==='mutant'?mutantSafeStep(entity,transform.position,direction,patrolStep):Vector3.add(transform.position,Vector3.scale(direction,patrolStep));if(!isInsideOutpost(next)&&(bot.airborne||bot.family==='mutant')){const groundAllowed=bot.variant==='king-mutant'?kingGroundAllowed(bot,next):true;if(groundAllowed){transform.position=next;if(!bot.airborne){transform.position.y=groundedMutantY(entity,transform.position)}}}continue}
+    if(!detected){if(bot.variant==='king-mutant'&&!kingPlayerOnHome){botHasSeenPlayer.set(bot.botId,false);bot.targetId=''}bot.aiState='patrol';if(bot.family==='mutant'&&bot.variant!=='king-mutant'&&localMutantWalkStates.get(bot.botId)!==true){playLocalMutantEmote(entity,ZOMBIE_WALK_EMOTE);localMutantWalkStates.set(bot.botId,true)}if(bot.variant==='king-mutant')playLocalKingAnimation(bot.botId,'Walk');const phase=now/(bot.variant==='king-mutant'?1500:1450)+entity,patrolRadius=bot.variant==='king-mutant'?28:10,homeIsland=bot.variant==='king-mutant'?kingHomeIsland(bot):undefined,rawPatrol=bot.variant==='king-mutant'&&homeIsland?Vector3.create(homeIsland.x+Math.sin(phase+(Math.floor(now/6000)+entity)*1.37)*homeIsland.rx*(.28+((entity+Math.floor(now/6000))%4)*.055),transform.position.y,homeIsland.z+Math.cos(phase*.71+(Math.floor(now/6000)+entity)*.91)*homeIsland.rz*(.28+((entity+2+Math.floor(now/6000))%4)*.055)):Vector3.create(bot.homeX+Math.sin(phase)*patrolRadius,bot.airborne?7+Math.sin(phase)*2:transform.position.y,bot.homeZ+Math.cos(phase)*patrolRadius),patrolNav={x:rawPatrol.x,z:rawPatrol.z},target=Vector3.create(patrolNav.x,rawPatrol.y,patrolNav.z);const direction=Vector3.normalize(Vector3.subtract(target,transform.position));const patrolStep=bot.speed*(bot.family==='mutant'?1.05:.42)*Math.min(dt,0.05);let next=bot.family==='mutant'?mutantSafeStep(entity,transform.position,direction,patrolStep):Vector3.add(transform.position,Vector3.scale(direction,patrolStep));if(!isInsideOutpost(next)&&(bot.airborne||bot.family==='mutant')){const groundAllowed=bot.variant==='king-mutant'?kingGroundAllowed(bot,next):true;if(groundAllowed){transform.position=next;if(!bot.airborne){transform.position.y=groundedMutantY(entity,transform.position)}}}continue}
     if(bot.family==='mutant'&&bot.variant!=='king-mutant'&&localMutantWalkStates.get(bot.botId)===true){playLocalMutantEmote(entity,'run');localMutantWalkStates.set(bot.botId,false)}
     bot.targetId='local-player';bot.lastKnownX=playerPosition.x;bot.lastKnownZ=playerPosition.z;bot.lastSeenAt=now
     // Mutant/King alert plays only on the moment this hostile newly sees/acquires the player.
@@ -613,7 +614,7 @@ function updateBots(dt: number, player: ReturnType<typeof PlayerState.getMutable
       if(bot.family==='mutant'){if(bot.variant==='king-mutant'){const n=entity,angle=now/780+n*1.73,radius=Math.min(7,Math.max(3.4,distance*.22));target=Vector3.create(target.x+Math.cos(angle)*radius,target.y,target.z+Math.sin(angle)*radius);target=Vector3.create(target.x,transform.position.y,target.z)}else{const flankAngle=now/2100+entity*2.17,flankRadius=1.4+(entity%4)*.55;target=Vector3.create(playerPosition.x+Math.cos(flankAngle)*flankRadius,transform.position.y,playerPosition.z+Math.sin(flankAngle)*flankRadius)}}
       const direction = Vector3.normalize(Vector3.subtract(target, transform.position))
       const boost=bot.family==='mutant'?(bot.variant==='berserker-mutant'?1.9:bot.variant==='king-mutant'?1.75:1.38):1.08
-      const step=bot.speed*boost*dt
+      const step=bot.speed*boost*Math.min(dt,0.05)
       const next = Vector3.add(transform.position, Vector3.scale(direction, step))
       const moveNext=bot.family==='mutant'?mutantSafeStep(entity,transform.position,direction,step):next
       if(!isInsideOutpost(moveNext)){const groundAllowed=bot.variant==='king-mutant'?kingGroundAllowed(bot,moveNext):true;if((bot.airborne||bot.family==='mutant')&&groundAllowed){transform.position.x=Math.max(2,Math.min(GAME.arenaSize-2,moveNext.x));transform.position.z=Math.max(2,Math.min(GAME.arenaSize-2,moveNext.z));if(!bot.airborne){transform.position.y=groundedMutantY(entity,transform.position)}}}
@@ -625,13 +626,13 @@ function updateBots(dt: number, player: ReturnType<typeof PlayerState.getMutable
       if(bot.family==='mutant'&&distance>.55){
         const flankAngle=now/1900+entity*2.17,flankRadius=bot.variant==='king-mutant'?0:1.25+(entity%3)*.5;const desired=Vector3.create(playerPosition.x+Math.cos(flankAngle)*flankRadius,playerPosition.y,playerPosition.z+Math.sin(flankAngle)*flankRadius);const nav={x:desired.x,z:desired.z}; let target=Vector3.create(nav.x,transform.position.y,nav.z)
         if(bot.variant==='king-mutant'){const n=entity,angle=now/780+n*1.73,radius=Math.min(7,Math.max(3.4,distance*.22));target=Vector3.create(target.x+Math.cos(angle)*radius,target.y,target.z+Math.sin(angle)*radius)}
-        const direction=Vector3.normalize(Vector3.subtract(target,transform.position)),step=bot.speed*(bot.variant==='king-mutant'?1.45:1.08)*dt
+        const direction=Vector3.normalize(Vector3.subtract(target,transform.position)),step=bot.speed*(bot.variant==='king-mutant'?1.45:1.08)*Math.min(dt,0.05)
         let moveNext=mutantSafeStep(entity,transform.position,direction,step)
         if(!isInsideOutpost(moveNext)){const groundAllowed=bot.variant==='king-mutant'?kingGroundAllowed(bot,moveNext):true;if(groundAllowed){transform.position.x=moveNext.x;transform.position.z=moveNext.z;transform.position.y=groundedMutantY(entity,transform.position)}}
       }
       const hasLos=enemyHasLineOfSight(entity,transform.position,playerPosition)
       if(!hasLos){bot.aiState='chase';continue}
-      if (now - (botLastShotAt.get(bot.botId) ?? 0) > (bot.family==='drone'?1650:bot.variant==='king-mutant'?1535:1350)) {
+      if (now - (botLastShotAt.get(bot.botId) ?? 0) > ((bot.family==='drone'?1650:bot.variant==='king-mutant'?1535:1350)/3)) {
         bot.aiState='attack'
         if(bot.variant==='king-mutant'){const flip=!(kingAttackFlip.get(bot.botId)??false);kingAttackFlip.set(bot.botId,flip);playLocalKingAnimation(bot.botId,flip?'Attack 1':'Attack 2',true)}
         botLastShotAt.set(bot.botId, now)
