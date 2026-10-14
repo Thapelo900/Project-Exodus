@@ -67,6 +67,13 @@ const botParts = new Map<string, Entity[]>()
 const kingModels = new Map<string, Entity>()
 const kingAnimationState = new Map<string, string>()
 const kingAttackFlip = new Map<string, boolean>()
+const kingChargeReadyAt = new Map<string,number>()
+const kingChargeUntil = new Map<string,number>()
+const kingChargeHit = new Set<string>()
+function faceLocalMutantToPlayer(transform:ReturnType<typeof Transform.getMutable>,target:Vector3){
+  const toward=Vector3.create(target.x-transform.position.x,0,target.z-transform.position.z)
+  if(Vector3.length(toward)>.01)transform.rotation=Quaternion.lookRotation(Vector3.normalize(toward))
+}
 const deadEnemyRemoveAt = new Map<Entity, number>()
 const enemyBlockedRoarAt = new Map<string, number>()
 const mutantProbeNextAt = new Map<Entity, number>()
@@ -605,6 +612,33 @@ function updateBots(dt: number, player: ReturnType<typeof PlayerState.getMutable
     // Mutant/King alert plays only on the moment this hostile newly sees/acquires the player.
     // audio.ts owns a single shared source, so simultaneous detections can never overlap.
     if(bot.family==='mutant' && !botHasSeenPlayer.get(bot.botId)){botHasSeenPlayer.set(bot.botId,true);playMutantAlertSound();if(bot.variant==='king-mutant')playLocalKingAnimation(bot.botId,'Roar',true)}
+    if(bot.family==='mutant')faceLocalMutantToPlayer(transform,playerPosition)
+    if(bot.variant==='king-mutant'&&distance<=10&&!playerSafe){
+      if(now>=(kingChargeReadyAt.get(bot.botId)??0)&&distance>2.3){
+        kingChargeReadyAt.set(bot.botId,now+6200)
+        kingChargeUntil.set(bot.botId,now+1300)
+        kingChargeHit.delete(bot.botId)
+        playLocalKingAnimation(bot.botId,'Walk',true)
+      }
+      if(now<(kingChargeUntil.get(bot.botId)??0)){
+        const toward=Vector3.create(playerPosition.x-transform.position.x,0,playerPosition.z-transform.position.z)
+        const before=Vector3.clone(transform.position)
+        const next=mutantSafeStep(entity,transform.position,toward,bot.speed*3.2*Math.min(dt,.05))
+        if(kingGroundAllowed(bot,next)&&!isInsideOutpost(next)){
+          transform.position.x=next.x;transform.position.z=next.z
+          transform.position.y=groundedMutantY(entity,transform.position)
+        }
+        faceLocalMutantToPlayer(transform,playerPosition)
+        const moved=Math.hypot(transform.position.x-before.x,transform.position.z-before.z)
+        const contact=Math.hypot(transform.position.x-playerPosition.x,transform.position.z-playerPosition.z)
+        if(contact<=2.25&&!kingChargeHit.has(bot.botId)&&moved>.01){
+          damageLocalPlayer(player,Math.max(4,Math.round(bot.damage*1.3)))
+          kingChargeHit.add(bot.botId)
+          kingChargeUntil.set(bot.botId,0)
+        }
+        continue
+      }
+    }
     if (distance > range) {
       bot.aiState='chase'
       if(bot.variant==='king-mutant')playLocalKingAnimation(bot.botId,'Walk')
@@ -620,7 +654,8 @@ function updateBots(dt: number, player: ReturnType<typeof PlayerState.getMutable
       if(!isInsideOutpost(moveNext)){const groundAllowed=bot.variant==='king-mutant'?kingGroundAllowed(bot,moveNext):true;if((bot.airborne||bot.family==='mutant')&&groundAllowed){transform.position.x=Math.max(2,Math.min(GAME.arenaSize-2,moveNext.x));transform.position.z=Math.max(2,Math.min(GAME.arenaSize-2,moveNext.z));if(!bot.airborne){transform.position.y=groundedMutantY(entity,transform.position)}}}
       if(bot.airborne)transform.position.y=Math.max(5,Math.min(12,next.y))
       const faceDirection=bot.variant==='king-mutant'?Vector3.normalize(Vector3.create(playerPosition.x-transform.position.x,0,playerPosition.z-transform.position.z)):direction
-      transform.rotation = Quaternion.lookRotation(faceDirection)
+      if(bot.family==='mutant')faceLocalMutantToPlayer(transform,playerPosition)
+      else transform.rotation = Quaternion.lookRotation(faceDirection)
     } else {
       // v79: Kings keep advancing on a detected player while they fire.
       if(bot.family==='mutant'&&distance>.55){
@@ -630,6 +665,7 @@ function updateBots(dt: number, player: ReturnType<typeof PlayerState.getMutable
         let moveNext=mutantSafeStep(entity,transform.position,direction,step)
         if(!isInsideOutpost(moveNext)){const groundAllowed=bot.variant==='king-mutant'?kingGroundAllowed(bot,moveNext):true;if(groundAllowed){transform.position.x=moveNext.x;transform.position.z=moveNext.z;transform.position.y=groundedMutantY(entity,transform.position)}}
       }
+      if(bot.family==='mutant')faceLocalMutantToPlayer(transform,playerPosition)
       const hasLos=enemyHasLineOfSight(entity,transform.position,playerPosition)
       if(!hasLos){bot.aiState='chase';continue}
       if (now - (botLastShotAt.get(bot.botId) ?? 0) > ((bot.family==='drone'?1650:bot.variant==='king-mutant'?1535:1350)/3)) {
