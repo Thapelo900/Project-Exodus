@@ -1,8 +1,0 @@
-Project Exodus v295.3.20 — approved Mobile Landscape UI update
-
-Upload the files in this archive to GitHub main preserving the folder paths.
-Overwrite src/client/ui.tsx. Add/update the supplied Images files.
-The six v295.3.19 button-neon PNG files are deliberately excluded because the approved versions are already committed to GitHub under Images/ui/.
-Do NOT upload this ZIP itself into the repository; extract it first.
-This is a file packaging operation only; the game has not been runtime-tested in this session.
-NOTE: src/client/ui.tsx refers to some assets with lowercase images/ paths. Verify deployment path casing against your repository before publishing.
