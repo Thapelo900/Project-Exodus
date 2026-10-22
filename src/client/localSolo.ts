@@ -356,6 +356,7 @@ export function useLocalItem(item: InventoryItem) {
     if (player.hp >= 100) return 'Health is already full'
     player.medkits -= 1
     player.hp = Math.min(100, player.hp + 40)
+    player.medkitsUsed += 1
     return 'Medkit restored 40 health'
   }
   if (item === 'water') {
@@ -467,7 +468,13 @@ function collectLoot(player: ReturnType<typeof PlayerState.getMutable>, playerPo
     else if (loot.kind === 'bomb') player.bombs += loot.amount
     else player.ammoRifle += loot.amount
     player.lootCollected += 1
-    if(loot.kind.startsWith('ammo-')) player.weaponsCollected += 1
+    if(loot.kind.startsWith('ammo-')) {
+      player.weaponsCollected += 1
+      player.ammoRoundsCollected += Math.max(0, loot.amount)
+    }
+    const gearKinds=['ammo-rifle','ammo-pistol','ammo-shotgun','medkit','shield-cell','water','bomb','materials']
+    const gearIndex=gearKinds.indexOf(loot.kind)
+    if(gearIndex>=0) player.gearTypesMask |= (1<<gearIndex)
     if(player.lootCollected%25===0) player.legendaryLoot += 1
     loot.active = false
     Transform.getMutable(entity).position.y = -20
@@ -696,7 +703,13 @@ function localSoloSystem(dt: number) {
   const player = PlayerState.getMutable(playerEntity)
   // Pickup collection must not be disabled by an unexpected match phase transition.
   const pickupTransform = Transform.getOrNull(engine.PlayerEntity)
-  if (player.alive && pickupTransform && !clientState.memoryStoryOpen && !clientState.dataStoryOpen) collectLoot(player, pickupTransform.position)
+  if (player.alive && pickupTransform && !clientState.memoryStoryOpen && !clientState.dataStoryOpen) {
+    collectLoot(player, pickupTransform.position)
+    const locs=Object.values(LOCATIONS)
+    for(let i=0;i<locs.length;i++){
+      if(Math.hypot(pickupTransform.position.x-locs[i].x,pickupTransform.position.z-locs[i].z)<=14) player.locationsDiscovered |= (1<<i)
+    }
+  }
   if (match.phase !== 'active') return
   // Story pickups pause solo simulation completely until the player closes the popup.
   if (clientState.memoryStoryOpen || clientState.dataStoryOpen) return
