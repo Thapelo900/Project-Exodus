@@ -63,6 +63,8 @@ import { Color4, Quaternion, Vector3 } from '@dcl/sdk/math'
 import { syncEntity } from '@dcl/sdk/network'
 import { Storage } from '@dcl/sdk/server'
 import { onLeaveScene } from '@dcl/sdk/src/players'
+import { BADGE_GEAR, completedMissionMask, completedPlaceMask, isInGameNight, missionForIndex, missionIsFast } from '../shared/badgeTracking'
+import { GENERATED_MISSIONS } from '../shared/generatedMissions'
 
 type PersistedLoadout = {
   equippedWeapon: WeaponId
@@ -100,6 +102,9 @@ type PersistedLoadout = {
   weaponsCollected?: number
   ammoRoundsCollected?: number
   gearTypesMask?: number
+  badgeGearUsedMask?: number
+  badgePlacesMask?: number
+  explosiveKills?: number
   speedRuns?: number
   nightMissions?: number
   missionDamageTaken?: number
@@ -158,8 +163,8 @@ function playKingAnimation(entity:Entity, botId:string, clip:string, force=false
 }
 
 const ZOMBIE_WALK_EMOTE = 'urn:decentraland:matic:collections-v2:0xee3d536845a4750906b3dbc66629f6aed3023f27:5'
-const mutantWalkStates = new Map<string, boolean>()
-const enemyEmoteCounters = new Map<string, number>()
+ const mutantWalkStates = new Map<string, boolean>()
+ const enemyEmoteCounters = new Map<string, number>()
 const builds = new Map<string, Entity>()
 const loot = new Map<string, Entity>()
 const thrownBombs = new Map<string, Entity>()
@@ -180,6 +185,7 @@ let nextEnemyId = 1
 let nextBombId = 1
 let reinforcementsSpawned = 0
 let missionAdvanceAt = 0
+const activeGeneratedMissionByPlayer=new Map<string,number>()
 
 const defaultLoadout: PersistedLoadout = {
   equippedWeapon: 'pulse-rifle',
@@ -195,7 +201,7 @@ const defaultLoadout: PersistedLoadout = {
   bombs: BOMB.startingCount,
   lifeCredits: 0,
   lifetimeKills: 0,
-  missionsCompleted: 0, mutantKills:0, droneKills:0, lootCollected:0, explosivesUsed:0, healingDone:0, medkitsUsed:0, watersUsed:0, tradesCompleted:0, soloMissions:0, coopMissions:0, suppliesDelivered:0, outpostDefenses:0, cleanSweeps:0, locationsDiscovered:0, missionTypesMask:0, noHitMissions:0, headshots:0, legendaryLoot:0, weaponsCollected:0, ammoRoundsCollected:0, gearTypesMask:0, speedRuns:0, nightMissions:0, missionDamageTaken:0, missionStartedAt:Date.now()
+  missionsCompleted: 0, mutantKills:0, droneKills:0, lootCollected:0, explosivesUsed:0, healingDone:0, medkitsUsed:0, watersUsed:0, tradesCompleted:0, soloMissions:0, coopMissions:0, suppliesDelivered:0, outpostDefenses:0, cleanSweeps:0, locationsDiscovered:0, missionTypesMask:0, noHitMissions:0, headshots:0, legendaryLoot:0, weaponsCollected:0, ammoRoundsCollected:0, gearTypesMask:0, badgeGearUsedMask:0, badgePlacesMask:0, explosiveKills:0, speedRuns:0, nightMissions:0, missionDamageTaken:0, missionStartedAt:Date.now()
 }
 
 function normalizeAddress(value: string) {
@@ -293,7 +299,7 @@ async function loadPlayer(address: string, displayName: string) {
     missionComplete: false,
     missionsCompleted: Math.max(0, persisted.missionsCompleted ?? 0),
     mutantKills: Math.max(0,persisted.mutantKills??0), droneKills: Math.max(0,persisted.droneKills??0), lootCollected: Math.max(0,persisted.lootCollected??0), explosivesUsed: Math.max(0,persisted.explosivesUsed??0), healingDone: Math.max(0,persisted.healingDone??0), medkitsUsed: Math.max(0,persisted.medkitsUsed??0), watersUsed: Math.max(0,persisted.watersUsed??0), tradesCompleted: Math.max(0,persisted.tradesCompleted??0), soloMissions: Math.max(0,persisted.soloMissions??0), coopMissions: Math.max(0,persisted.coopMissions??0),
-    suppliesDelivered:Math.max(0,persisted.suppliesDelivered??0), outpostDefenses:Math.max(0,persisted.outpostDefenses??0), cleanSweeps:Math.max(0,persisted.cleanSweeps??0), locationsDiscovered:Math.max(0,persisted.locationsDiscovered??0), missionTypesMask:Math.max(0,persisted.missionTypesMask??0), noHitMissions:Math.max(0,persisted.noHitMissions??0), headshots:Math.max(0,persisted.headshots??0), legendaryLoot:Math.max(0,persisted.legendaryLoot??0), weaponsCollected:Math.max(0,persisted.weaponsCollected??0), ammoRoundsCollected:Math.max(0,persisted.ammoRoundsCollected??0), gearTypesMask:Math.max(0,persisted.gearTypesMask??0), speedRuns:Math.max(0,persisted.speedRuns??0), nightMissions:Math.max(0,persisted.nightMissions??0), missionDamageTaken:0, missionStartedAt:Date.now(),
+    suppliesDelivered:Math.max(0,persisted.suppliesDelivered??0), outpostDefenses:Math.max(0,persisted.outpostDefenses??0), cleanSweeps:Math.max(0,persisted.cleanSweeps??0), locationsDiscovered:Math.max(0,persisted.locationsDiscovered??0), missionTypesMask:Math.max(0,persisted.missionTypesMask??0), noHitMissions:Math.max(0,persisted.noHitMissions??0), headshots:Math.max(0,persisted.headshots??0), legendaryLoot:Math.max(0,persisted.legendaryLoot??0), weaponsCollected:Math.max(0,persisted.weaponsCollected??0), ammoRoundsCollected:Math.max(0,persisted.ammoRoundsCollected??0), gearTypesMask:Math.max(0,persisted.gearTypesMask??0), badgeGearUsedMask:Math.max(0,persisted.badgeGearUsedMask??0), badgePlacesMask:Math.max(0,persisted.badgePlacesMask??0), explosiveKills:Math.max(0,persisted.explosiveKills??0), speedRuns:Math.max(0,persisted.speedRuns??0), nightMissions:Math.max(0,persisted.nightMissions??0), missionDamageTaken:0, missionStartedAt:Date.now(),
     joined: true,
     alive: true
   })
@@ -323,7 +329,7 @@ async function savePlayer(address: string) {
       bombs: state.bombs,
       lifeCredits: state.lifeCredits,
       lifetimeKills: state.kills,
-      missionsCompleted: state.missionsCompleted, mutantKills:state.mutantKills, droneKills:state.droneKills, lootCollected:state.lootCollected, explosivesUsed:state.explosivesUsed, healingDone:state.healingDone, medkitsUsed:state.medkitsUsed, watersUsed:state.watersUsed, tradesCompleted:state.tradesCompleted, soloMissions:state.soloMissions, coopMissions:state.coopMissions, suppliesDelivered:state.suppliesDelivered, outpostDefenses:state.outpostDefenses, cleanSweeps:state.cleanSweeps, locationsDiscovered:state.locationsDiscovered, missionTypesMask:state.missionTypesMask, noHitMissions:state.noHitMissions, headshots:state.headshots, legendaryLoot:state.legendaryLoot, weaponsCollected:state.weaponsCollected, ammoRoundsCollected:state.ammoRoundsCollected, gearTypesMask:state.gearTypesMask, speedRuns:state.speedRuns, nightMissions:state.nightMissions,
+      missionsCompleted: state.missionsCompleted, mutantKills:state.mutantKills, droneKills:state.droneKills, lootCollected:state.lootCollected, explosivesUsed:state.explosivesUsed, healingDone:state.healingDone, medkitsUsed:state.medkitsUsed, watersUsed:state.watersUsed, tradesCompleted:state.tradesCompleted, soloMissions:state.soloMissions, coopMissions:state.coopMissions, suppliesDelivered:state.suppliesDelivered, outpostDefenses:state.outpostDefenses, cleanSweeps:state.cleanSweeps, locationsDiscovered:state.locationsDiscovered, missionTypesMask:state.missionTypesMask, noHitMissions:state.noHitMissions, headshots:state.headshots, legendaryLoot:state.legendaryLoot, weaponsCollected:state.weaponsCollected, ammoRoundsCollected:state.ammoRoundsCollected, gearTypesMask:state.gearTypesMask, badgeGearUsedMask:state.badgeGearUsedMask, badgePlacesMask:state.badgePlacesMask, explosiveKills:state.explosiveKills, speedRuns:state.speedRuns, nightMissions:state.nightMissions,
       ...(clientProgress.get(address) ?? sanitizeProgress({}))
     },
     { skipIfUnchanged: true }
@@ -420,6 +426,7 @@ function removeDynamicEntities() {
   backupCalls.clear()
   kingChargeReadyAt.clear();kingChargeUntil.clear();kingChargeHit.clear()
   enemyEmoteCounters.clear()
+   mutantWalkStates.clear()
   reinforcementsSpawned = 0
   builds.clear()
   loot.clear()
@@ -741,6 +748,7 @@ function applyDamageToBot(entity: Entity, damage: number, attackerAddress: strin
     if (attacker) {
       attacker.kills += 1
       if(bot.family==='mutant') attacker.mutantKills += 1; else if(bot.family==='drone') attacker.droneKills += 1
+      if (explosiveDamageSource===attackerAddress) attacker.explosiveKills += 1
       attacker.materials += 2
     }
     announce('enemy-down', `${bot.displayName} neutralized${bot.family === 'drone' ? ' — ammunition crate dropped' : ' — contaminated material dropped'}`, attackerAddress)
@@ -795,7 +803,7 @@ function updateProjectiles(dt: number) {
         engine.removeEntity(entity); projectiles.delete(entity)
       }
     } else {
-      // Discard legacy enemy-targeted projectiles without causing friendly fire.
+      // Old faction-targeted projectiles must not damage any enemy.
       engine.removeEntity(entity); projectiles.delete(entity)
     }
   }
@@ -851,12 +859,14 @@ function handleFire(address: string, directionX: number, directionY: number, dir
 
   let headshot=false
   if(hitBot){const bt=Transform.getOrNull(hitBot);if(bt){const head=Vector3.create(bt.position.x,bt.position.y+(BotState.get(hitBot).family==='mutant'?1.65:.35),bt.position.z);const ht=pointToRayDistance(origin,direction,head);headshot=ht.distanceAlongRay<=effectiveRange&&ht.miss<=.42}}
+  state.badgeGearUsedMask |= weapon.id==='pulse-rifle'?BADGE_GEAR.rifle:weapon.id==='rail-pistol'?BADGE_GEAR.pistol:BADGE_GEAR.shotgun
   const hit = hitBot ? applyDamageToBot(hitBot, weapon.damage, address) : hitPlayer ? applyDamageToPlayer(hitPlayer, weapon.damage, address) : false
   if(hit&&headshot){state.headshots+=1; announce('headshot',`HEADSHOT ${state.headshots}/100`,address)}
   void room.send('weaponFired', { playerId: address, weapon: weapon.id })
     sendResult(address, 'fire', true, hit ? `Hit for ${weapon.damage}` : 'Shot fired')
 }
 
+let explosiveDamageSource = ''
 function explodeBomb(entity: Entity, bomb: ReturnType<typeof BombState.getMutable>) {
   const transform = Transform.getMutableOrNull(entity)
   if (!transform || bomb.phase !== 'thrown') return
@@ -877,7 +887,10 @@ function explodeBomb(entity: Entity, bomb: ReturnType<typeof BombState.getMutabl
   for (const [botEntity, bot, botTransform] of engine.getEntitiesWith(BotState, Transform)) {
     if (!bot.active) continue
     const distance = Vector3.distance(transform.position, botTransform.position)
-    if (distance <= BOMB.blastRadius) applyDamageToBot(botEntity, Math.max(12, Math.round(BOMB.maxDamage * (1 - distance / BOMB.blastRadius))), bomb.ownerId)
+    if (distance <= BOMB.blastRadius) {
+      explosiveDamageSource=bomb.ownerId
+      try { applyDamageToBot(botEntity, Math.max(12, Math.round(BOMB.maxDamage * (1 - distance / BOMB.blastRadius))), bomb.ownerId) } finally { explosiveDamageSource='' }
+    }
   }
   playerNoise.set(bomb.ownerId, { x: transform.position.x, z: transform.position.z, radius: 150, until: Date.now() + 3000 })
   announce('explosion', 'BOMB DETONATED')
@@ -893,6 +906,7 @@ function handleThrowBomb(address: string, directionX: number, directionY: number
   if (isInsideOutpost(position)) return sendResult(address, 'bomb', false, 'Explosives are secured inside the Outpost')
   player.bombs -= 1
   player.explosivesUsed += 1
+  player.badgeGearUsedMask |= BADGE_GEAR.bomb
   const bombId = `bomb-${MatchState.get(matchEntity).round}-${nextBombId++}`, entity = engine.addEntity()
   Transform.create(entity, { position: Vector3.create(position.x + direction.x, position.y + 1.45, position.z + direction.z), scale: Vector3.create(.34,.34,.34) })
   MeshRenderer.setSphere(entity)
@@ -996,11 +1010,11 @@ function collectNearbyLoot() {
 // sideways step through a collider. It stops, turns, probes the chosen side on the next
 // frame, and keeps following that wall until the direct route is clear again.
 const mutantWallAvoid = new Map<Entity,{side:number,until:number}>()
-const mutantProbes = new Map<Entity,{f:Entity,l:Entity,r:Entity,fl:Entity,fr:Entity}>()
+const mutantProbes = new Map<Entity,{f:Entity,l:Entity,r:Entity}>()
 function ensureMutantProbes(owner:Entity,position:Vector3){
   let p=mutantProbes.get(owner);if(p)return p
   const make=()=>{const e=engine.addEntity();Transform.create(e,{position:Vector3.clone(position)});Raycast.create(e,{originOffset:Vector3.create(0,1.05,0),direction:{$case:'globalDirection',globalDirection:Vector3.Forward()},maxDistance:2.4,queryType:RaycastQueryType.RQT_HIT_FIRST,timestamp:Date.now()});return e}
-  p={f:make(),l:make(),r:make(),fl:make(),fr:make()};mutantProbes.set(owner,p);return p
+  p={f:make(),l:make(),r:make()};mutantProbes.set(owner,p);return p
 }
 function probeBlocked(e:Entity,max:number){const h=RaycastResult.getOrNull(e)?.hits?.[0];return !!h&&h.length<=max}
 // v127: IslandTerrain.glb is the authoritative enemy walking surface.
@@ -1011,22 +1025,19 @@ function groundedMutantY(_owner:Entity,position:Vector3){return mutantSurfaceY(p
 function mutantPhysicsStep(entity:Entity,position:Vector3,direction:Vector3,step:number){
   const flat=Vector3.normalize(Vector3.create(direction.x,0,direction.z));if(Vector3.length(flat)<.001)return Vector3.clone(position)
   const left=Vector3.normalize(Vector3.create(-flat.z,0,flat.x)),right=Vector3.scale(left,-1),max=Math.max(2.2,step+1.8),p=ensureMutantProbes(entity,position)
-  const fb=probeBlocked(p.f,max),lb=probeBlocked(p.l,max),rb=probeBlocked(p.r,max),flb=probeBlocked(p.fl,max),frb=probeBlocked(p.fr,max),now=Date.now()
+  const fb=probeBlocked(p.f,max),lb=probeBlocked(p.l,max),rb=probeBlocked(p.r,max),now=Date.now()
   const aim=(e:Entity,d:Vector3)=>{Transform.getMutable(e).position=Vector3.clone(position);const r=Raycast.getMutable(e);r.originOffset=Vector3.create(0,1.05,0);r.direction={$case:'globalDirection',globalDirection:d};r.maxDistance=max;r.timestamp=now}
-  const fLeft=Vector3.normalize(Vector3.add(Vector3.scale(flat,.88),Vector3.scale(left,.48))),fRight=Vector3.normalize(Vector3.add(Vector3.scale(flat,.88),Vector3.scale(right,.48)))
-  aim(p.f,flat);aim(p.l,left);aim(p.r,right);aim(p.fl,fLeft);aim(p.fr,fRight)
-  const bodyBlocked=fb||flb||frb
+  aim(p.f,flat);aim(p.l,left);aim(p.r,right)
   let avoid=mutantWallAvoid.get(entity)
-  if(bodyBlocked){if(!avoid||avoid.until<=now)avoid={side:lb&&!rb?-1:rb&&!lb?1:((entity%2)*2-1),until:now+1800};else avoid.until=now+700;mutantWallAvoid.set(entity,avoid)}
+  if(fb){if(!avoid||avoid.until<=now)avoid={side:lb&&!rb?-1:rb&&!lb?1:((entity%2)*2-1),until:now+1800};else avoid.until=now+700;mutantWallAvoid.set(entity,avoid)}
   if(avoid&&avoid.until>now){
     const sideDir=avoid.side>0?left:right,sideBlocked=avoid.side>0?lb:rb
     if(sideBlocked){const other=avoid.side>0?rb:lb;if(!other){avoid.side=-avoid.side;mutantWallAvoid.set(entity,avoid);return Vector3.add(position,Vector3.scale(avoid.side>0?left:right,Math.min(step,.10)))}return Vector3.clone(position)}
-    if(!bodyBlocked)avoid.until=Math.min(avoid.until,now+260)
+    if(!fb)avoid.until=Math.min(avoid.until,now+260)
     return Vector3.add(position,Vector3.scale(sideDir,Math.min(step,.10)))
   }
-  mutantWallAvoid.delete(entity);if(bodyBlocked)return Vector3.clone(position)
-  // Small accepted steps prevent fast enemies tunnelling through thin authored GLB walls.
-  return Vector3.add(position,Vector3.scale(flat,Math.min(step,.16)))
+  mutantWallAvoid.delete(entity);if(fb)return Vector3.clone(position)
+  return Vector3.add(position,Vector3.scale(flat,step))
 }
 
 function moveEnemy(entity:Entity, transform: ReturnType<typeof Transform.getMutable>, target: Vector3, speed: number, dt: number, airborne: boolean, offsetX = 0, offsetZ = 0, pursueOffLand = false) {
@@ -1043,6 +1054,7 @@ function moveEnemy(entity:Entity, transform: ReturnType<typeof Transform.getMuta
   if(!airborne) {
     const corridorStep=Vector3.add(transform.position,Vector3.scale(direction,Math.min(step,.12)))
     next=isOnMutantBridge(transform.position)&&isOnMutantBridge(corridorStep)?corridorStep:mutantPhysicsStep(entity,transform.position,direction,step)
+    // Keep ground-based enemies on actual island/bridge corridors, not the sea planes.
     if(!isOnMutantIslandGround(next)&&!isOnMutantBridge(next)) next=Vector3.clone(transform.position)
   }
   if (!airborne && state.variant==='king-mutant') {
@@ -1110,7 +1122,7 @@ function updateBots(dt: number) {
       const seen = distance <= bot.detection * (bot.family === 'mutant' ? 1.35 : 1)
       if ((seen || heard) && distance < targetDistance) { targetId = address; targetPosition = position; targetDistance = distance }
     }
-    // Hostile NPCs acquire living players only; never another hostile.
+    // Hostiles never acquire another hostile as a target; only live players are valid targets.
 
     if (targetPosition) {
       if(bot.family==='mutant' && bot.variant!=='king-mutant' && mutantWalkStates.get(bot.botId)===true){playMutantEmote(entity,bot.botId,'run');mutantWalkStates.set(bot.botId,false)}
@@ -1177,7 +1189,7 @@ function updateBots(dt: number) {
           createEnemyProjectile(Vector3.create(transform.position.x, transform.position.y + (bot.family === 'drone' ? -.2 : 1.5), transform.position.z), targetId, projectileDamage, bot.variant==='king-mutant')
         }
         else if (players.has(targetId)) applyDamageToPlayer(targetId, Math.max(1,Math.round(bot.damage*.45)), bot.botId)
-        // Hostile NPCs cannot damage other hostiles.
+        // No friendly-fire or faction-versus-faction damage.
       }
     } else if (targetPosition) {
       bot.aiState = 'chase'; if(bot.variant==='king-mutant')playKingAnimation(entity,bot.botId,'Walk'); setEnemyEye(bot.botId, 'chase')
@@ -1254,12 +1266,13 @@ function serverSystem(dt: number) {
           if(state.mode==='solo-bots') player.soloMissions+=1
           if(state.mode==='coop-bots') player.coopMissions+=1
           player.cleanSweeps+=1
-          player.missionTypesMask |= (1 << ((mission-1)%10))
+          const missionDef=missionForIndex(activeGeneratedMissionByPlayer.get(address) ?? -1)
+          if(missionDef){player.missionTypesMask |= completedMissionMask(missionDef); player.badgePlacesMask |= completedPlaceMask(missionDef)}
           if(mission===1) player.outpostDefenses+=1
           if(mission===7) player.suppliesDelivered+=10
           if(player.missionDamageTaken===0) player.noHitMissions+=1
-          const duration=now-Number(player.missionStartedAt||now); if(duration<=300000) player.speedRuns+=1
-          const hour=new Date(now).getUTCHours(); if(hour>=18||hour<6) player.nightMissions+=1
+          if(missionIsFast(player.missionStartedAt,now)) player.speedRuns+=1
+          if(isInGameNight(state.startsAt,now)) player.nightMissions+=1
           player.missionDamageTaken=0; player.missionStartedAt=now
           void savePlayer(address)
         }
@@ -1268,6 +1281,7 @@ function serverSystem(dt: number) {
         missionAdvanceAt = 0
         if (mission >= GAME.totalMissions) { finishRound(); return }
         state.threatLevel = mission + 1
+        for(const [,entity] of players){const pl=PlayerState.getMutableOrNull(entity);if(pl?.joined)pl.missionStartedAt=now}
         spawnMissionEnemies(state.threatLevel)
       }
     }
@@ -1335,6 +1349,7 @@ export function setupServer() {
     if (!players.has(address) && joinedPlayerCount() >= GAME.maxPlayers) return sendResult(address, 'join', false, 'Arena is full')
     executeTask(async () => {
       await loadPlayer(address, data.displayName.slice(0, 32))
+      activeGeneratedMissionByPlayer.set(address,clientProgress.get(address)?.missionAcceptedIndex??-1)
       sendProgress(address, clientProgress.get(address) ?? sanitizeProgress({}))
       sendResult(address, 'join', true, 'Loadout and campaign progress synchronized')
       announce('joined', `${data.displayName || 'A runner'} entered the lobby`)
@@ -1348,6 +1363,8 @@ export function setupServer() {
     try {
       const parsed = JSON.parse(data.payload || '{}')
       clientProgress.set(address, sanitizeProgress(parsed))
+      // Snapshot selection only at the moment of acceptance; active wave remains assigned to the original mission.
+      if(!missionAdvanceAt) activeGeneratedMissionByPlayer.set(address, clientProgress.get(address)?.missionAcceptedIndex??-1)
       executeTask(() => savePlayer(address))
     } catch {
       console.error(`[SERVER] Invalid progress payload from ${address}`)
@@ -1416,14 +1433,14 @@ export function setupServer() {
       if (player.medkits <= 0) return sendResult(address, 'item', false, 'No medkits')
       if (player.hp >= 100) return sendResult(address, 'item', false, 'Health is already full')
       player.medkits -= 1
-      const beforeHp=player.hp; player.hp = Math.min(100, player.hp + 40); player.healingDone += player.hp-beforeHp; player.medkitsUsed += 1
+      const beforeHp=player.hp; player.hp = Math.min(100, player.hp + 40); player.healingDone += player.hp-beforeHp; player.medkitsUsed += 1; player.badgeGearUsedMask |= BADGE_GEAR.medkit
       return sendResult(address, 'item', true, 'Medkit restored 40 health')
     }
     if (data.item === 'water') {
       if (player.water <= 0) return sendResult(address, 'item', false, 'No water')
       if (player.stamina >= 100) return sendResult(address, 'item', false, 'Stamina is already full')
       player.water -= 1
-      player.stamina = Math.min(100, player.stamina + 45); player.watersUsed += 1
+      player.stamina = Math.min(100, player.stamina + 45); player.watersUsed += 1; player.badgeGearUsedMask |= BADGE_GEAR.water
       return sendResult(address, 'item', true, 'Water restored stamina for faster running')
     }
     if (player.shieldCells <= 0) return sendResult(address, 'item', false, 'No shield cells')
@@ -1456,8 +1473,8 @@ export function setupServer() {
     const target = LOCATIONS[mission.target]
     if (!isNear(address, target.x, target.z, 9)) return
     player.missionComplete = true
-    player.missionsCompleted += 1
-    const mode=MatchState.get(matchEntity).mode; if(mode==='solo-bots') player.soloMissions+=1; if(mode==='coop-bots') player.coopMissions+=1
+    // Local location terminal objective is separate from hostile-clear wave missions.
+    const mode=MatchState.get(matchEntity).mode
     player.materials += mission.rewardMaterials
     sendResult(address, 'mission', true, `Mission complete: +${mission.rewardMaterials} materials`)
     executeTask(() => savePlayer(address))
