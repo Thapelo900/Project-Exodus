@@ -87,7 +87,7 @@ function fullMap(){
 }
 
 function enemyCounts(){let mutants=0,drones=0,kings=0;for(const [,bot] of engine.getEntitiesWith(BotState)){if(!bot.active||bot.hp<=0)continue;if(bot.variant==='king-mutant')kings++;else if(bot.family==='mutant')mutants++;else if(bot.family==='drone')drones++;}return {mutants,drones,kings}}
-function mission(){const match=getMatchState(),counts=enemyCounts(),i=Math.max(0,Math.min(GENERATED_MISSIONS.length-1,clientState.missionAcceptedIndex>=0?clientState.missionAcceptedIndex:0)),gm=GENERATED_MISSIONS[i],loc=(LOCATIONS as any)[gm.place],complete=(match?.announcement??'').includes('COMPLETE');return <UiEntity uiTransform={{positionType:'absolute',position:clientState.isMobile?{left:18,top:130}:{left:16,top:258},width:clientState.isMobile?293:318,height:clientState.isMobile?173:198,padding:10,flexDirection:'column',borderColor:c.red,borderWidth:{left:2,top:1,right:1,bottom:1}}} uiBackground={panel}><Label value={`MISSION ${String(gm.id).padStart(3,'0')} — ${gm.name}`} fontSize={16} color={c.white} uiTransform={{width:clientState.isMobile?273:308,height:30}}/><Label value={complete?'MISSION COMPLETE':`${gm.objective} • ${gm.difficulty} • ${loc.name}`} fontSize={complete?20:13} color={complete?c.green:c.cyan} uiTransform={{width:clientState.isMobile?273:308,height:28}}/><Label value={gm.brief} fontSize={11} color={c.white} uiTransform={{width:clientState.isMobile?273:308,height:70}}/><Label value={`HOSTILES  M ${counts.mutants}  D ${counts.drones}  K ${counts.kings}`} fontSize={14} color={c.red} uiTransform={{width:clientState.isMobile?273:308,height:28}}/><Label value={`Memory ${clientState.missionMemoryFound}/${gm.memory} • Data RAM ${clientState.missionDataRamFound}/${gm.ram}`} fontSize={11} color={c.muted} uiTransform={{width:clientState.isMobile?273:308,height:24}}/></UiEntity>}
+function mission(){const match=getMatchState(),counts=enemyCounts(),i=Math.max(0,Math.min(GENERATED_MISSIONS.length-1,clientState.missionAcceptedIndex>=0?clientState.missionAcceptedIndex:0)),gm=GENERATED_MISSIONS[i],loc=(LOCATIONS as any)[gm.place],complete=(match?.announcement??'').includes('COMPLETE');return <UiEntity uiTransform={{positionType:'absolute',position:clientState.isMobile?{left:18,top:130}:{left:16,top:258},width:clientState.isMobile?293:318,height:clientState.isMobile?188:198,padding:clientState.isMobile?7:10,flexDirection:'column',borderColor:c.red,borderWidth:{left:2,top:1,right:1,bottom:1}}} uiBackground={panel}><Label value={`MISSION ${String(gm.id).padStart(3,'0')} — ${gm.name}`} fontSize={clientState.isMobile?12:16} color={c.white} uiTransform={{width:clientState.isMobile?269:308,height:clientState.isMobile?27:30}}/><Label value={complete?'MISSION COMPLETE':clientState.isMobile?`${gm.objective}  •  ${gm.difficulty}\n${loc.name}`:`${gm.objective} • ${gm.difficulty} • ${loc.name}`} fontSize={complete?20:clientState.isMobile?11:13} color={complete?c.green:c.cyan} uiTransform={{width:clientState.isMobile?269:308,height:clientState.isMobile?39:28}}/><Label value={gm.brief} fontSize={clientState.isMobile?10:11} color={c.white} uiTransform={{width:clientState.isMobile?269:308,height:clientState.isMobile?54:70}}/><Label value={`HOSTILES  M ${counts.mutants}  D ${counts.drones}  K ${counts.kings}`} fontSize={clientState.isMobile?11:14} color={c.red} uiTransform={{width:clientState.isMobile?269:308,height:clientState.isMobile?24:28}}/><Label value={`Memory ${clientState.missionMemoryFound}/${gm.memory} • Data RAM ${clientState.missionDataRamFound}/${gm.ram}`} fontSize={clientState.isMobile?10:11} color={c.muted} uiTransform={{width:clientState.isMobile?269:308,height:clientState.isMobile?22:24}}/></UiEntity>}
 
 function missionCompleteBanner(){const m=getMatchState(),num=Math.max(1,m?.threatLevel??1);if(!(m?.announcement??'').includes(`MISSION ${num} COMPLETE`))return null;return <UiEntity uiTransform={{positionType:'absolute',position:{left:'50%',top:'42%'},margin:'0 0 0 -430px',width:860,height:150,padding:'28px 22px 18px 22px',alignItems:'center',justifyContent:'center',borderWidth:0,zIndex:80}} uiBackground={{color:Color4.fromHexString('#08090bf5')}}><UiEntity uiTransform={{positionType:'absolute',position:{left:0,top:0},width:860,height:150,zIndex:81,pointerFilter:'none'}} uiBackground={{texture:{src:'Images/ui/exodus-expanded/mission-complete-frame.png'},textureMode:'stretch'}}/><Label value={`MISSION ${num} COMPLETE`} fontSize={48} color={c.red} uiTransform={{width:820,height:90}}/></UiEntity>}
 
@@ -269,6 +269,22 @@ function modeGuidePopup(){
  const pc=controls?'W A S D   MOVE\nSHIFT   SPRINT\nSPACE   JUMP\nLEFT CLICK   SHOOT\n1 / 2 / 3   SELECT GUN\n4   THROW BOMB\n5   USE MEDKIT\n6   DRINK WATER\nE   INTERACT / RELOAD\nF   PLACE BUILD MATERIAL':'1. SELECT A GAME MODE\n2. PRESS ENTER EXODUS\n3. VISIT GEAR AND MISSION TERMINALS\n4. COLLECT AMMO, MEDKITS AND WATER\n5. FIGHT MUTANTS AND DRONES\n6. COMPLETE MISSIONS\n7. RECOVER MEMORY PACKS AND DATA RAMS'
  const touch=controls?'LEFT JOYSTICK   MOVE\nSWIPE SCREEN   LOOK AROUND\nFIRE BUTTON   SHOOT\nTAP WEAPON SLOT   SWITCH GUN\nTAP BOMB SLOT   THROW BOMB\nTAP MEDKIT / WATER   USE ITEM\nJUMP BUTTON   JUMP\nINTERACT BUTTON   PICK UP / USE\nMINIMAP   OPEN MAP':'SOLO: PLAY ALONE AGAINST HOSTILES\nCO-OP: TEAM UP AGAINST HOSTILES\nPVP: COMPETE AGAINST OTHER PLAYERS\nPVPVE: FIGHT PLAYERS AND HOSTILES\n\nSAME ISLAND. NEW MISSION.'
  const title=controls?'CONTROLS — PC & MOBILE':'HOW TO PLAY — PROJECT EXODUS'
+ if(isMobile){
+  // v295.3.21: stacked, vertically separated guide sections for landscape phones.
+  // The overlay remains within the same safe-area and keeps its close button above the text.
+  return <UiEntity uiTransform={{positionType:'absolute',position:{left:'8%',top:'5%'},width:'84%',height:'90%',zIndex:150,pointerFilter:'block'}} uiBackground={{texture:{src:'Images/ui/exodus-guide-mobile.png'},textureMode:'stretch'}}>
+   <Label value={title} color={c.white} fontSize={18} textAlign="middle-center" uiTransform={{positionType:'absolute',position:{left:'13%',top:'2%'},width:'74%',height:'8%',pointerFilter:'none'}}/>
+   <Button value="✕ CLOSE" fontSize={12} color={c.white} uiTransform={{positionType:'absolute',position:{right:'6%',top:'10%'},width:'27%',height:30,pointerFilter:'block',borderWidth:2,borderColor:c.red}} uiBackground={{color:Color4.fromHexString('#690d18ff')}} onMouseDown={()=>{playUiSelectSound();modeGuideTab=''}}/>
+   <UiEntity uiTransform={{positionType:'absolute',position:{left:'10%',top:'20%'},width:'80%',height:'30%',flexDirection:'column',alignItems:'center',pointerFilter:'none'}}>
+    <Label value={controls?'PC / KEYBOARD + MOUSE':'MISSION OBJECTIVES'} color={c.cyan} fontSize={14} textAlign="middle-center" uiTransform={{width:'100%',height:'21%',pointerFilter:'none'}}/>
+    <Label value={pc} color={c.white} fontSize={controls?10:11} textAlign="middle-center" uiTransform={{width:'100%',height:'79%',pointerFilter:'none'}}/>
+   </UiEntity>
+   <UiEntity uiTransform={{positionType:'absolute',position:{left:'10%',top:'54%'},width:'80%',height:'34%',flexDirection:'column',alignItems:'center',pointerFilter:'none'}}>
+    <Label value={controls?'MOBILE / TOUCH CONTROLS':'GAME MODES'} color={c.red} fontSize={14} textAlign="middle-center" uiTransform={{width:'100%',height:'20%',pointerFilter:'none'}}/>
+    <Label value={touch} color={c.white} fontSize={controls?10:11} textAlign="middle-center" uiTransform={{width:'100%',height:'80%',pointerFilter:'none'}}/>
+   </UiEntity>
+  </UiEntity>
+ }
  return <UiEntity uiTransform={{positionType:'absolute',position:{left:isMobile?'8%':410,top:isMobile?'5%':140},width:isMobile?'84%':1100,height:isMobile?'90%':780,zIndex:150,pointerFilter:'block'}} uiBackground={{texture:{src:isMobile?'Images/ui/exodus-guide-mobile.png':'Images/ui/exodus-guide-desktop.png'},textureMode:'stretch'}}>
   <Label value={title} color={c.white} fontSize={isMobile?21:27} textAlign="middle-center" uiTransform={{positionType:'absolute',position:{left:'12%',top:isMobile?'3%':'4%'},width:'76%',height:isMobile?'7%':'8%',pointerFilter:'none'}}/>
   <Button value="✕ CLOSE" fontSize={isMobile?14:16} color={c.white} uiTransform={{positionType:'absolute',position:{right:isMobile?'6%':'5%',top:isMobile?'10%':'11%'},width:isMobile?'27%':150,height:isMobile?38:43,pointerFilter:'block',borderWidth:2,borderColor:c.red}} uiBackground={{color:Color4.fromHexString('#690d18ff')}} onMouseDown={()=>{playUiSelectSound();modeGuideTab=''}}/>
@@ -339,9 +355,9 @@ const BADGES=[
 ['SUPPLIER','Deliver supplies to the Outpost through supply objectives.','suppliesDelivered',10],
 ['CLEAN SWEEP','Complete a mission after eliminating every required enemy.','cleanSweeps',1],
 ['OUTPOST HERO','Complete the Outpost objective / defense mission.','outpostDefenses',1],
-['PLANT RUNNER','Complete the Plant objective.','missionType',3],
-['DOCKS DEALER','Complete the Docks objective.','missionType',4],
-['ARENA CHAMPION','Complete the Arena objective.','missionType',5],
+['PLANT RUNNER','Complete a generated mission assigned to The Plant.','badgePlace',1],
+['DOCKS DEALER','Complete a generated mission assigned to The Docks.','badgePlace',2],
+['ARENA CHAMPION','Complete a generated mission assigned to The Arena.','badgePlace',4],
 ['EXPLORER','Discover all 8 named Project Exodus locations.','locations',8],
 ['LOOT MASTER','Collect all rare loot rewards: find 5 legendary/rare loot drops.','legendaryLoot',5],
 ['DRONE HUNTER','Eliminate 50 Drones.','droneKills',50],
@@ -350,23 +366,23 @@ const BADGES=[
 ['SURVIVOR','Use 100 medkits.','medkitsUsed',100],
 ['EXPLOSIVE EXPERT','Use 50 bombs or explosives during combat.','explosivesUsed',50],
 ['AMMO COLLECTOR','Pick up a total of 500 ammunition rounds.','ammoRoundsCollected',500],
-['GEAR MASTER','Collect every gear type at least once.','gearTypes',8],
-['EXPLORER','Discover all 8 named Project Exodus locations.','locations',8],
+['GEAR MASTER','Use Rifle, Pistol, Shotgun, Medkit, Water and Bomb at least once.','badgeGearUsed',6],
+['BOMBARDIER','Eliminate 10 enemies with confirmed explosive damage.','explosiveKills',10],
 ['LOOT CHAMPION','Collect at least one rare / legendary loot reward.','legendaryLoot',1],
-['MISSION MASTER','Complete all 10 Project Exodus mission types.','missionTypes',10],
-['LEGENDARY LOOTER','Find 5 legendary loot rewards. A legendary reward is discovered every 25th pickup.','legendaryLoot',5],
+['MISSION MASTER','Complete DEFEND, ELIMINATE, RECOVER, RECON, ESCORT, SABOTAGE, EXTRACT and HOLD objectives.','missionTypes',8],
+['DRONE DESTROYER','Eliminate 100 drones.','droneKills',100],
 ['GEAR COLLECTOR','Collect 100 weapon/ammunition gear pickups.','weaponsCollected',100],
-['SCOUT MASTER','Discover all 8 named locations on the Project Exodus map.','locations',8],
+['MUTANT EXTERMINATOR','Eliminate 100 mutants.','mutantKills',100],
 ['LOOT LEGEND','Collect 500 individual loot pickups.','lootCollected',500],
-['MISSION SPECIALIST','Complete all 10 unique mission types at least once.','missionTypes',10],
-['SPEED RUNNER','Complete a mission in under 5 minutes.','speedRuns',1],
-['NIGHT OPS','Complete a mission during the night cycle.','nightMissions',1],
+['VETERAN SURVIVOR','Complete 25 genuine missions.','missionsCompleted',25],
+['SPEED RUNNER','Complete an eligible mission in 5 minutes or less.','speedRuns',1],
+['NIGHT OPS','Complete 3 missions during the in-game nighttime cycle.','nightMissions',3],
 ['LONE WOLF','Complete 10 solo missions.','soloMissions',10],
 ['TEAM PLAYER','Complete 10 co-op missions with other survivors.','coopMissions',10],
 ['EXODUS ELITE','Unlock all 29 previous Project Exodus badges.','all',29]
 ] as const
 function bitCount(n:number){let c=0;for(let v=n>>>0;v;v>>>=1)c+=v&1;return c}
-function badgeProgress(p:any,b:any): number{if(!p)return 0;if(b[2]==='all')return BADGES.slice(0,29).filter(x=>badgeProgress(p,x)>=x[3]).length;if(b[2]==='locations')return bitCount(Number(p.locationsDiscovered??0));if(b[2]==='missionTypes')return bitCount(Number(p.missionTypesMask??0)&1023);if(b[2]==='gearTypes')return bitCount(Number(p.gearTypesMask??0)&255);if(b[2]==='missionType')return (Number(p.missionTypesMask??0)&(1<<(Number(b[3])-1)))?Number(b[3]):0;return Math.max(0,Number(p[b[2]]??0))}
+function badgeProgress(p:any,b:any): number{if(!p)return 0;if(b[2]==='all')return BADGES.slice(0,29).filter(x=>badgeProgress(p,x)>=x[3]).length;if(b[2]==='locations')return bitCount(Number(p.locationsDiscovered??0));if(b[2]==='missionTypes')return bitCount(Number(p.missionTypesMask??0)&255);if(b[2]==='badgePlace')return (Number(p.badgePlacesMask??0)&Number(b[3]))?1:0;if(b[2]==='badgeGearUsed')return bitCount(Number(p.badgeGearUsedMask??0)&63);if(b[2]==='gearTypes')return bitCount(Number(p.gearTypesMask??0)&255);if(b[2]==='missionType')return (Number(p.missionTypesMask??0)&(1<<(Number(b[3])-1)))?Number(b[3]):0;return Math.max(0,Number(p[b[2]]??0))}
 function badgeCollection(){
  if(!clientState.badgesOpen)return null
  const p:any=getLocalPlayerState(),earned=BADGES.filter(b=>badgeProgress(p,b)>=b[3]).length,sel=BADGES[Math.max(0,Math.min(29,clientState.selectedBadge))],prog=badgeProgress(p,sel),unlocked=prog>=sel[3]
