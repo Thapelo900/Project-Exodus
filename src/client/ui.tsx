@@ -235,96 +235,67 @@ function controlsOverlay(){if(!clientState.controlsOpen)return null;return <UiEn
 
 function welcomeScreen(){
  if(!clientState.welcomeOpen)return null
- const hover=clientState.hoveredMenuButton==='welcome-enter'
- const mobileMenu=clientState.isMobile;return <UiEntity uiTransform={mobileMenu?{positionType:'absolute',position:{left:0,top:0},width:'100%',height:'100%',zIndex:190,pointerFilter:'block'}:{positionType:'absolute',position:{left:0,top:0},width:1920,height:1080,zIndex:190,pointerFilter:'block'}} uiBackground={{texture:{src:'Images/project-exodus-welcome.png'},textureMode:'stretch'}}>
-   {hover&&<UiEntity uiTransform={{positionType:'absolute',position:mobileMenu?{left:'30.73%',top:'72.78%'}:{left:590,top:786},width:mobileMenu?'37.71%':724,height:mobileMenu?'14.26%':154,zIndex:191,pointerFilter:'none'}} uiBackground={{texture:{src:'Images/ui/welcome-enter-hover.png'},textureMode:'stretch'}}/>}
-   <Button value="" uiTransform={{positionType:'absolute',position:mobileMenu?{left:'30.73%',top:'72.78%'}:{left:590,top:786},width:mobileMenu?'37.71%':724,height:mobileMenu?'14.26%':154,zIndex:192,borderWidth:0}} uiBackground={{color:Color4.fromHexString('#00000001')}} onMouseEnter={()=>{if(clientState.hoveredMenuButton!=='welcome-enter'){clientState.hoveredMenuButton='welcome-enter';playUiHoverSound()}}} onMouseLeave={()=>{if(clientState.hoveredMenuButton==='welcome-enter')clientState.hoveredMenuButton=''}} onMouseDown={()=>{playUiSelectSound();clientState.hoveredMenuButton='';clientState.welcomeLoadingUntil=0;clientState.joining=false;clientState.welcomeOpen=false;modeMenuLaunched=false}}/>
-   
-
+ const progress=clientState.welcomeLoadingUntil>0?Math.min(100,Math.max(0,Math.floor((10000-(clientState.welcomeLoadingUntil-Date.now()))/100))):0
+ // The image has only an EMPTY decorative frame: no baked-in fill or percentage.
+ // Coordinates are matched to the approved 1672x941 image, stretched full screen.
+ return <UiEntity uiTransform={{positionType:'absolute',position:{left:0,top:0},width:'100%',height:'100%',zIndex:190,pointerFilter:'block'}} uiBackground={{texture:{src:'Images/ui/exodus-welcome-initializing.png'},textureMode:'stretch'}}>
+   <UiEntity uiTransform={{positionType:'absolute',position:{left:'24.7%',top:'58.5%'},width:`${42.0*progress/100}%`,height:'2.35%',zIndex:191,pointerFilter:'none'}} uiBackground={{color:Color4.fromHexString('#ff2828ff')}}/>
  </UiEntity>
 }
 
-// v295.3.5: the PC and mobile artwork use different, fully aligned click regions.
-let modeActionHover: 'controls' | 'howto' | 'enter' | '' = ''
-let modeGuideTab: 'controls' | 'howto' | '' = ''
-let menuSelectedMode: GameMode = 'solo-bots'
-let modeMenuLaunched = false // Latch: only Back/Welcome can re-open the mode selector
-function modeRegion(x:number,y:number,w:number,h:number){
- return <Button value="" fontSize={1} color={Color4.fromHexString('#ffffff00')} uiTransform={{positionType:'absolute',position:{left:x,top:y},width:w,height:h,zIndex:25,pointerFilter:'block',borderWidth:0}} uiBackground={{color:Color4.fromHexString('#00000001')}}/>
+// Exact approved full-screen artwork; transparent interactive regions match its visible controls.
+// All coordinates use the 1672x941 artwork and scale uniformly in landscape.
+let menuSelectedMode: GameMode = 'coop-bots'
+let modeMenuLaunched = false
+let modeSettingsOpen = false
+let modeSettingsTab: 'gameplay' | 'audio' | 'video' | 'controls' | 'hud' = 'gameplay'
+let settingsCrosshair = true
+let settingsMinimap = true
+let draftCrosshair = true
+let draftMinimap = true
+function artHotspot(x:number,y:number,w:number,h:number,action:()=>void){
+ return <Button value="" fontSize={1} color={Color4.fromHexString('#ffffff00')}
+ uiTransform={{positionType:'absolute',position:{left:`${x/16.72}%`,top:`${y/9.41}%`},width:`${w/16.72}%`,height:`${h/9.41}%`,zIndex:142,pointerFilter:'block',borderWidth:0}}
+ uiBackground={{color:Color4.fromHexString('#00000001')}} onMouseDown={()=>{playUiSelectSound();action()}}/>
 }
-function modeSelectCard(mode:GameMode,x:number,y:number,w:number,h:number){
- const id='mode-'+mode
- return <UiEntity uiTransform={{positionType:'absolute',position:clientState.isMobile?{left:`${x/19.2}%`,top:`${y/10.8}%`}:{left:x,top:y},width:clientState.isMobile?`${w/19.2}%`:w,height:clientState.isMobile?`${h/10.8}%`:h,zIndex:30,pointerFilter:'block'}} uiBackground={{color:Color4.fromHexString('#00000001')}} onMouseEnter={()=>{if(clientState.hoveredMenuButton!==id){clientState.hoveredMenuButton=id;playUiHoverSound()}}} onMouseDown={()=>{playUiSelectSound();menuSelectedMode=mode;clientState.selectedMode=mode}}>
- </UiEntity>
+function settingsHotspot(x:number,y:number,w:number,h:number,action:()=>void){
+ return <Button value="" fontSize={1} color={Color4.fromHexString('#ffffff00')}
+ uiTransform={{positionType:'absolute',position:{left:`${x/16.72}%`,top:`${y/9.41}%`},width:`${w/16.72}%`,height:`${h/9.41}%`,zIndex:188,pointerFilter:'block',borderWidth:0}}
+ uiBackground={{color:Color4.fromHexString('#00000001')}} onMouseDown={()=>{playUiSelectSound();action()}}/>
 }
-function modeMenuButton(x:number,y:number,w:number,h:number,fn:()=>void,action: 'controls' | 'howto' | 'enter' | '' = ''){
- return <UiEntity uiTransform={{positionType:'absolute',position:clientState.isMobile?{left:`${x/19.2}%`,top:`${y/10.8}%`}:{left:x,top:y},width:clientState.isMobile?`${w/19.2}%`:w,height:clientState.isMobile?`${h/10.8}%`:h,zIndex:31,pointerFilter:'none'}}>
-  {action!==''&&modeActionHover===action&&<UiEntity uiTransform={{positionType:'absolute',position:{left:0,top:0},width:'100%',height:'100%',pointerFilter:'none'}} uiBackground={{texture:{src:clientState.isMobile?(action==='enter'?'Images/ui/exodus-button-neon-mobile-enter-fit.png':action==='howto'?'Images/ui/exodus-button-neon-mobile-howto-fit.png':'Images/ui/exodus-button-neon-mobile-guide-fit.png'):(action==='controls'?'Images/ui/exodus-button-neon-controls-fit.png':action==='howto'?'Images/ui/exodus-button-neon-howto-fit.png':'Images/ui/exodus-button-neon-enter-fit.png')},textureMode:'stretch'}}/>}
-  <Button value="" fontSize={1} color={Color4.fromHexString('#ffffff00')} uiTransform={{positionType:'absolute',position:{left:0,top:0},width:'100%',height:'100%',zIndex:32,pointerFilter:'block',borderWidth:0}} uiBackground={{color:Color4.fromHexString('#00000001')}} onMouseEnter={()=>{if(action!==''){modeActionHover=action;playUiHoverSound()}}} onMouseLeave={()=>{if(modeActionHover===action)modeActionHover=''}} onMouseDown={()=>{playUiSelectSound();modeActionHover='';fn()}}/>
- </UiEntity>
-}
-function modeGuidePopup(){
- if(!modeGuideTab)return null
- const controls=modeGuideTab==='controls',isMobile=clientState.isMobile
- const pc=controls?'W A S D   MOVE\nSHIFT   SPRINT\nSPACE   JUMP\nLEFT CLICK   SHOOT\n1 / 2 / 3   SELECT GUN\n4   THROW BOMB\n5   USE MEDKIT\n6   DRINK WATER\nE   INTERACT / RELOAD\nF   PLACE BUILD MATERIAL':'1. SELECT A GAME MODE\n2. PRESS ENTER EXODUS\n3. VISIT GEAR AND MISSION TERMINALS\n4. COLLECT AMMO, MEDKITS AND WATER\n5. FIGHT MUTANTS AND DRONES\n6. COMPLETE MISSIONS\n7. RECOVER MEMORY PACKS AND DATA RAMS'
- const touch=controls?'LEFT JOYSTICK   MOVE\nSWIPE SCREEN   LOOK AROUND\nFIRE BUTTON   SHOOT\nTAP WEAPON SLOT   SWITCH GUN\nTAP BOMB SLOT   THROW BOMB\nTAP MEDKIT / WATER   USE ITEM\nJUMP BUTTON   JUMP\nINTERACT BUTTON   PICK UP / USE\nMINIMAP   OPEN MAP':'SOLO: PLAY ALONE AGAINST HOSTILES\nCO-OP: TEAM UP AGAINST HOSTILES\nPVP: COMPETE AGAINST OTHER PLAYERS\nPVPVE: FIGHT PLAYERS AND HOSTILES\n\nSAME ISLAND. NEW MISSION.'
- const title=controls?'CONTROLS — PC & MOBILE':'HOW TO PLAY — PROJECT EXODUS'
- if(isMobile){
-  // v295.3.21: stacked, vertically separated guide sections for landscape phones.
-  // The overlay remains within the same safe-area and keeps its close button above the text.
-  return <UiEntity uiTransform={{positionType:'absolute',position:{left:'8%',top:'5%'},width:'84%',height:'90%',zIndex:150,pointerFilter:'block'}} uiBackground={{texture:{src:'Images/ui/exodus-guide-mobile.png'},textureMode:'stretch'}}>
-   <Label value={title} color={c.white} fontSize={18} textAlign="middle-center" uiTransform={{positionType:'absolute',position:{left:'13%',top:'2%'},width:'74%',height:'8%',pointerFilter:'none'}}/>
-   <Button value="✕ CLOSE" fontSize={12} color={c.white} uiTransform={{positionType:'absolute',position:{right:'6%',top:'10%'},width:'27%',height:30,pointerFilter:'block',borderWidth:2,borderColor:c.red}} uiBackground={{color:Color4.fromHexString('#690d18ff')}} onMouseDown={()=>{playUiSelectSound();modeGuideTab=''}}/>
-   <UiEntity uiTransform={{positionType:'absolute',position:{left:'10%',top:'20%'},width:'80%',height:'30%',flexDirection:'column',alignItems:'center',pointerFilter:'none'}}>
-    <Label value={controls?'PC / KEYBOARD + MOUSE':'MISSION OBJECTIVES'} color={c.cyan} fontSize={14} textAlign="middle-center" uiTransform={{width:'100%',height:'21%',pointerFilter:'none'}}/>
-    <Label value={pc} color={c.white} fontSize={controls?10:11} textAlign="middle-center" uiTransform={{width:'100%',height:'79%',pointerFilter:'none'}}/>
-   </UiEntity>
-   <UiEntity uiTransform={{positionType:'absolute',position:{left:'10%',top:'54%'},width:'80%',height:'34%',flexDirection:'column',alignItems:'center',pointerFilter:'none'}}>
-    <Label value={controls?'MOBILE / TOUCH CONTROLS':'GAME MODES'} color={c.red} fontSize={14} textAlign="middle-center" uiTransform={{width:'100%',height:'20%',pointerFilter:'none'}}/>
-    <Label value={touch} color={c.white} fontSize={controls?10:11} textAlign="middle-center" uiTransform={{width:'100%',height:'80%',pointerFilter:'none'}}/>
-   </UiEntity>
-  </UiEntity>
- }
- return <UiEntity uiTransform={{positionType:'absolute',position:{left:isMobile?'8%':410,top:isMobile?'5%':140},width:isMobile?'84%':1100,height:isMobile?'90%':780,zIndex:150,pointerFilter:'block'}} uiBackground={{texture:{src:isMobile?'Images/ui/exodus-guide-mobile.png':'Images/ui/exodus-guide-desktop.png'},textureMode:'stretch'}}>
-  <Label value={title} color={c.white} fontSize={isMobile?21:27} textAlign="middle-center" uiTransform={{positionType:'absolute',position:{left:'12%',top:isMobile?'3%':'4%'},width:'76%',height:isMobile?'7%':'8%',pointerFilter:'none'}}/>
-  <Button value="✕ CLOSE" fontSize={isMobile?14:16} color={c.white} uiTransform={{positionType:'absolute',position:{right:isMobile?'6%':'5%',top:isMobile?'10%':'11%'},width:isMobile?'27%':150,height:isMobile?38:43,pointerFilter:'block',borderWidth:2,borderColor:c.red}} uiBackground={{color:Color4.fromHexString('#690d18ff')}} onMouseDown={()=>{playUiSelectSound();modeGuideTab=''}}/>
-  <UiEntity uiTransform={{positionType:'absolute',position:{left:isMobile?'7%':'7%',top:isMobile?'21%':'21%'},width:isMobile?'41%':'41%',height:isMobile?'64%':'64%',flexDirection:'column',justifyContent:'flex-start',alignItems:'center',padding:isMobile?8:14,pointerFilter:'none'}}>
-   <Label value={controls?'PC / KEYBOARD + MOUSE':'MISSION OBJECTIVES'} color={c.cyan} fontSize={isMobile?16:21} textAlign="middle-center" uiTransform={{width:'100%',height:isMobile?36:50,pointerFilter:'none'}}/>
-   <Label value={pc} color={c.white} fontSize={isMobile?13:17} textAlign="middle-center" uiTransform={{width:'100%',height:isMobile?'80%':'84%',pointerFilter:'none'}}/>
-  </UiEntity>
-  <UiEntity uiTransform={{positionType:'absolute',position:{left:isMobile?'52%':'52%',top:isMobile?'21%':'21%'},width:isMobile?'41%':'41%',height:isMobile?'64%':'64%',flexDirection:'column',justifyContent:'flex-start',alignItems:'center',padding:isMobile?8:14,pointerFilter:'none'}}>
-   <Label value={controls?'MOBILE / TOUCH CONTROLS':'GAME MODES'} color={c.red} fontSize={isMobile?16:21} textAlign="middle-center" uiTransform={{width:'100%',height:isMobile?36:50,pointerFilter:'none'}}/>
-   <Label value={touch} color={c.white} fontSize={isMobile?13:17} textAlign="middle-center" uiTransform={{width:'100%',height:isMobile?'80%':'84%',pointerFilter:'none'}}/>
-  </UiEntity>
+function settingsMenu(){
+ if(!modeSettingsOpen)return null
+ const tabs: Array<['gameplay'|'audio'|'video'|'controls'|'hud',string]>=[['gameplay','GAMEPLAY'],['audio','AUDIO'],['video','VIDEO'],['controls','CONTROLS'],['hud','UI / HUD']]
+ const info=modeSettingsTab==='audio'?'AUDIO\\n\\nVolume and music controls are managed by the Decentraland client.':modeSettingsTab==='video'?'VIDEO\\n\\nGraphics quality and FPS are managed by the Decentraland client.':modeSettingsTab==='controls'?'CONTROLS\\n\\nPC: WASD Move  |  Shift Sprint  |  Space Jump\\nLeft Click Shoot  |  1-3 Weapons  |  4 Bomb\\n5 Medkit  |  6 Water  |  E Interact / Use / Reload  |  F Build\\n\\nMobile: Touch joystick, fire and item controls.':''
+ return <UiEntity uiTransform={{positionType:'absolute',position:{left:0,top:0},width:'100%',height:'100%',zIndex:180,pointerFilter:'block'}} uiBackground={{texture:{src:'Images/ui/exodus-settings-approved.png'},textureMode:'stretch'}}>
+  {tabs.map((t,i)=><UiEntity uiTransform={{positionType:'absolute',position:{left:'9%',top:`${(204+i*106)/9.41}%`},width:'16.5%',height:'8.3%',borderWidth:modeSettingsTab===t[0]?3:0,borderColor:c.red,pointerFilter:'none'}}/>)}
+  <Label value={modeSettingsTab==='gameplay'?'GAMEPLAY':modeSettingsTab==='hud'?'UI / HUD':modeSettingsTab.toUpperCase()} fontSize={clientState.isMobile?21:32} color={c.red} uiTransform={{positionType:'absolute',position:{left:'33%',top:'34%'},width:'53%',height:'7%',pointerFilter:'none'}}/>
+  {(modeSettingsTab==='gameplay'||modeSettingsTab==='hud')?<UiEntity uiTransform={{width:'100%',height:'100%',pointerFilter:'none'}}>
+   <Button value={`CROSSHAIR  ${draftCrosshair?'ON':'OFF'}`} fontSize={clientState.isMobile?13:22} color={c.white} uiTransform={{positionType:'absolute',position:{left:'34%',top:'45%'},width:'48%',height:'9%',borderWidth:2,borderColor:c.red,pointerFilter:'block'}} uiBackground={{color:Color4.fromHexString('#24272eff')}} onMouseDown={()=>draftCrosshair=!draftCrosshair}/>
+   <Button value={`MINIMAP  ${draftMinimap?'ON':'OFF'}`} fontSize={clientState.isMobile?13:22} color={c.white} uiTransform={{positionType:'absolute',position:{left:'34%',top:'58%'},width:'48%',height:'9%',borderWidth:2,borderColor:c.red,pointerFilter:'block'}} uiBackground={{color:Color4.fromHexString('#24272eff')}} onMouseDown={()=>draftMinimap=!draftMinimap}/>
+  </UiEntity>:<Label value={info} fontSize={clientState.isMobile?13:21} color={c.white} textAlign="middle-center" uiTransform={{positionType:'absolute',position:{left:'32%',top:'43%'},width:'54%',height:'29%',pointerFilter:'none'}}/>}
+  {tabs.map((t,i)=>settingsHotspot(150,204+i*106,275,78,()=>modeSettingsTab=t[0]))}
+  {settingsHotspot(1420,80,125,105,()=>{modeSettingsOpen=false})}
+  {settingsHotspot(835,777,285,73,()=>{draftCrosshair=true;draftMinimap=true})}
+  {settingsHotspot(1150,777,340,73,()=>{settingsCrosshair=draftCrosshair;settingsMinimap=draftMinimap;modeSettingsOpen=false})}
  </UiEntity>
 }
 function lobby(){
  if(clientState.welcomeOpen||clientState.joining||clientState.joined||clientState.cinematicActive||modeMenuLaunched)return null
- const mobile=clientState.isMobile
- return <UiEntity uiTransform={mobile?{positionType:'absolute',position:{left:0,top:0},width:'100%',height:'100%',zIndex:120,pointerFilter:'block'}:{positionType:'absolute',position:{left:0,top:0},width:1920,height:1080,zIndex:120,pointerFilter:'block'}} uiBackground={{texture:{src:mobile?'Images/project-exodus-mode-mobile.png':'Images/project-exodus-opening-menu.png'},textureMode:'stretch'}}>
-  <UiEntity uiTransform={{positionType:'absolute',position:{left:0,top:0},width:mobile?'100%':1920,height:mobile?'100%':1080,zIndex:29,pointerFilter:'none'}} uiBackground={{texture:{src:clientState.isMobile?('Images/ui/mode-glow-mobile-'+(menuSelectedMode==='solo-bots'?'solo':menuSelectedMode==='coop-bots'?'coop':menuSelectedMode==='pvp'?'pvp':'pvpve')+'.png'):('Images/ui/mode-glow-pc-'+(menuSelectedMode==='solo-bots'?'solo':menuSelectedMode==='coop-bots'?'coop':menuSelectedMode==='pvp'?'pvp':'pvpve')+'.png')},textureMode:'stretch'}}/>
-  {mobile?<UiEntity uiTransform={{width:'100%',height:'100%',pointerFilter:'none'}}>
-   {modeSelectCard('solo-bots',410,355,1100,125)}
-   {modeSelectCard('coop-bots',410,485,1100,125)}
-   {modeSelectCard('pvp',410,615,1100,125)}
-   {modeSelectCard('pvp-bots',410,745,1100,125)}
-   {modeMenuButton(410,888,490,62,()=>modeGuideTab='controls','controls')}
-   {modeMenuButton(920,888,590,62,()=>modeGuideTab='howto','howto')}
-   {modeMenuButton(610,964,700,78,()=>{modeGuideTab='';modeMenuLaunched=true;requestJoin(menuSelectedMode)},'enter')}
-   {modeMenuButton(45,972,235,67,()=>{modeGuideTab='';modeActionHover='';modeMenuLaunched=false;clientState.welcomeOpen=true})}
-  </UiEntity>:<UiEntity uiTransform={{width:'100%',height:'100%',pointerFilter:'none'}}>
-   {modeSelectCard('solo-bots',46,491,458,335)}
-   {modeSelectCard('coop-bots',539,491,422,335)}
-   {modeSelectCard('pvp',996,491,422,335)}
-   {modeSelectCard('pvp-bots',1450,491,430,335)}
-   {modeMenuButton(192,873,468,92,()=>modeGuideTab='controls','controls')}
-   {modeMenuButton(680,873,471,92,()=>modeGuideTab='howto','howto')}
-   {modeMenuButton(1169,870,626,90,()=>{modeGuideTab='';modeMenuLaunched=true;requestJoin(menuSelectedMode)},'enter')}
-   {modeMenuButton(48,965,236,80,()=>{modeGuideTab='';modeActionHover='';modeMenuLaunched=false;clientState.welcomeOpen=true})}
-  </UiEntity>}
-  {modeGuidePopup()}
+ return <UiEntity uiTransform={{positionType:'absolute',position:{left:0,top:0},width:'100%',height:'100%',zIndex:120,pointerFilter:'block'}} uiBackground={{texture:{src:clientState.isMobile?'Images/ui/exodus-modes-mobile-landscape.png':'Images/ui/exodus-modes-pc.png'},textureMode:'stretch'}}>
+
+  {/* Selected mode: diffuse glow only, with no hard selection outline. */}
+  <UiEntity uiTransform={{positionType:'absolute',position:{left:0,top:0},width:'100%',height:'100%',pointerFilter:'none',zIndex:121}}
+    uiBackground={{texture:{src:clientState.isMobile
+      ? (menuSelectedMode==='pvp'?'Images/ui/exodus-pvp-glow-mobile-v19.png':'Images/ui/exodus-coop-glow-mobile-v19.png')
+      : (menuSelectedMode==='pvp'?'Images/ui/exodus-pvp-glow-pc-v19.png':'Images/ui/exodus-coop-glow-pc-v19.png')},textureMode:'stretch'}}/>
+  {/* Hotspots align with the approved landscape artwork; controls/instructions are display-only. */}
+  {artHotspot(344,179,498,624,()=>{menuSelectedMode='coop-bots';clientState.selectedMode='coop-bots'})}
+  {artHotspot(847,178,475,625,()=>{menuSelectedMode='pvp';clientState.selectedMode='pvp'})}
+  {artHotspot(515,790,650,102,()=>{modeMenuLaunched=true;requestJoin(menuSelectedMode)})}
  </UiEntity>
 }
+
 function enemyTarget(){if(!clientState.enemyTargetName)return null;const pct=Math.max(0,Math.min(100,clientState.enemyTargetHp/Math.max(1,clientState.enemyTargetMaxHp)*100));return <UiEntity uiTransform={{positionType:'absolute',position:{left:'50%',top:clientState.isMobile?'72%':'58%'},margin:clientState.isMobile?'20px 0 0 -110px':'0 0 0 -145px',width:clientState.isMobile?240:330,height:clientState.isMobile?44:70,padding:clientState.isMobile?'5px 18px 3px 18px':'15px 18px 10px 18px',flexDirection:'column',borderWidth:0}} uiBackground={{color:Color4.fromHexString('#08090bf2')}}><UiEntity uiTransform={{positionType:'absolute',position:{left:0,top:0},width:clientState.isMobile?240:330,height:clientState.isMobile?44:70,zIndex:1,pointerFilter:'none'}} uiBackground={{texture:{src:'Images/ui/exodus-expanded/enemy-health-frame.png'},textureMode:'stretch'}}/><Label value={clientState.enemyTargetName} fontSize={clientState.isMobile?13:12} textAlign="middle-center" color={c.white} uiTransform={{width:clientState.isMobile?204:294,height:clientState.isMobile?21:18,zIndex:3}}/><UiEntity uiTransform={{width:clientState.isMobile?204:294,height:clientState.isMobile?7:10,zIndex:3}} uiBackground={{color:Color4.fromHexString('#34393eff')}}><UiEntity uiTransform={{width:`${pct}%`,height:10}} uiBackground={{color:c.red}}/></UiEntity></UiEntity>}
 function droneAlert(){if(!clientState.droneAlert)return null;return <Label value={clientState.droneAlert} fontSize={18} color={c.red} uiTransform={{positionType:'absolute',position:{left:'50%',top:130},margin:'0 0 0 -250px',width:500,height:46,padding:10,borderColor:c.red,borderWidth:2}} uiBackground={panel}/>}
 function damageIndicator(){const d=clientState.damageDirection;if(!d)return null;if(d==='LEFT')return <Label value="▲ LEFT" fontSize={24} color={c.red} uiTransform={{positionType:'absolute',position:{left:35,top:480},width:110,height:42,pointerFilter:'none'}}/>;if(d==='RIGHT')return <Label value="RIGHT ▲" fontSize={24} color={c.red} uiTransform={{positionType:'absolute',position:{right:35,top:480},width:110,height:42,pointerFilter:'none'}}/>;return <Label value={`▲ ${d}`} fontSize={24} color={c.red} uiTransform={{positionType:'absolute',position:d==='FRONT'?{left:'50%',top:115}:{left:'50%',bottom:120},margin:'0 0 0 -55px',width:110,height:42,pointerFilter:'none'}}/>}
@@ -408,7 +379,7 @@ function badgeCollection(){
 function scopeOverlay(){if(!clientState.scopeToggled)return null;const p=getLocalPlayerState();if(p?.equippedWeapon==='rail-pistol')return null;return <UiEntity uiTransform={{positionType:'absolute',position:{left:0,top:0},width:'100%',height:'100%',zIndex:90,pointerFilter:'none'}} uiBackground={{texture:{src:'Images/scope-overlay.png'},textureMode:'stretch'}}><Label value="5x ZOOM" fontSize={18} color={c.red} uiTransform={{positionType:'absolute',position:{right:70,top:52},width:130,height:34}}/><Button value="EXIT SCOPE" fontSize={16} color={c.white} uiTransform={{positionType:'absolute',position:{right:45,bottom:45},width:180,height:48,borderColor:c.line,borderWidth:2,pointerFilter:'block'}} uiBackground={{color:c.red}} onMouseDown={toggleScope}/></UiEntity>}
 
 
-function memoryPickup(){if(!clientState.memoryPickupActive)return null;const pct=Math.round(clientState.memoryPickupProgress*100),sec=Math.min(10,Math.floor(clientState.memoryPickupProgress*10));const memory=clientState.memoryPickupKind==='memory';return <UiEntity uiTransform={{positionType:'absolute',position:{left:'50%',bottom:118},margin:'0 0 0 -210px',width:440,height:100,padding:'18px 22px 12px 22px',flexDirection:'column',borderWidth:0,zIndex:35}} uiBackground={{color:Color4.fromHexString('#08090bf2')}}><UiEntity uiTransform={{positionType:'absolute',position:{left:0,top:0},width:440,height:100,zIndex:36,pointerFilter:'none'}} uiBackground={{texture:{src:memory?'Images/ui/exodus-expanded/memory-loading-frame.png':'Images/ui/exodus-expanded/data-loading-frame.png'},textureMode:'stretch'}}/><Label value={`${memory?'MEMORY PACK':'DATA RAM'} — COLLECTING ${sec}/10s`} fontSize={15} color={memory?c.red:c.cyan} uiTransform={{width:396,height:28}}/><UiEntity uiTransform={{width:396,height:16,borderColor:memory?c.red:c.blue,borderWidth:1}} uiBackground={{color:c.soft}}><UiEntity uiTransform={{width:`${pct}%`,height:16}} uiBackground={{color:memory?c.red:c.blue}}/></UiEntity></UiEntity>}
+function memoryPickup(){if(!clientState.memoryPickupActive)return null;const pct=Math.round(clientState.memoryPickupProgress*100),sec=Math.min(10,Math.floor(clientState.memoryPickupProgress*10));const memory=clientState.memoryPickupKind==='memory';return <UiEntity uiTransform={{positionType:'absolute',position:{left:'50%',bottom:118},margin:'0 0 0 -210px',width:440,height:100,padding:'18px 22px 12px 22px',flexDirection:'column',borderWidth:0,zIndex:35}} uiBackground={{color:Color4.fromHexString('#08090bf2')}}><UiEntity uiTransform={{positionType:'absolute',position:{left:0,top:0},width:440,height:100,zIndex:36,pointerFilter:'none'}} uiBackground={{texture:{src:memory?'Images/ui/exodus-expanded/memory-loading-frame.png':'Images/ui/exodus-expanded/data-loading-frame.png'},textureMode:'stretch'}}/><Label value={`${memory?'MEMORY PACK':'DATA RAM'} — INITIALIZING ${sec}/10s`} fontSize={15} color={memory?c.red:c.cyan} uiTransform={{width:396,height:28}}/><UiEntity uiTransform={{width:396,height:16,borderColor:memory?c.red:c.blue,borderWidth:1}} uiBackground={{color:c.soft}}><UiEntity uiTransform={{width:`${pct}%`,height:16}} uiBackground={{color:memory?c.red:c.blue}}/></UiEntity></UiEntity>}
 
 function memoryStoryPopup(){
  if(!clientState.memoryStoryOpen)return null
@@ -458,5 +429,5 @@ function gameplayFrame(){const player=getLocalPlayerState();if(player&&!player.a
 function alphaTestLabel(){return <Label value="Alpha Test v0. 00" fontSize={16} color={c.white} uiTransform={{positionType:'absolute',position:{right:18,bottom:14},width:180,height:28,zIndex:165,pointerFilter:'none'}}/>}
 
 function mobileWallpaper(){return <UiEntity uiTransform={{positionType:'absolute',position:{left:0,top:0},width:'100%',height:'100%',pointerFilter:'none',zIndex:1}} uiBackground={{texture:{src:'Images/ui/exodus-mobile-popup-wallpaper.jpg'},textureMode:'stretch'}}/>}
-function hud(){if(clientState.welcomeOpen)return <UiEntity uiTransform={{width:'100%',height:'100%',pointerFilter:'none'}}>{welcomeScreen()}</UiEntity>;if(clientState.cinematicActive)return <UiEntity uiTransform={{width:'100%',height:'100%',pointerFilter:'none'}}>{cinematicOverlay()}</UiEntity>;if(!clientState.joined&&!clientState.joining)return <UiEntity uiTransform={{width:'100%',height:'100%',pointerFilter:'none'}}>{lobby()}</UiEntity>;const active=!clientState.insideOutpost;return <UiEntity uiTransform={{width:'100%',height:'100%',pointerFilter:'none'}}>{active&&compass()}{minimap()}{active&&mission()}{active&&matchInfo()}{active&&mobilePanelFrames()}{active&&mobileRightStackFrame()}{active&&survival()}{active&&ammo()}{active&&quickbar()}{active&&!clientState.isMobile&&controls()}{active&&(getLocalPlayerState()?.alive??true)&&gameplayFrame()}{active&&!clientState.aiming&&crosshair()}{controlsOverlay()}{badgeCollection()}{memoryPickup()}{memoryStoryPopup()}{dataStoryPopup()}{missionCompleteBanner()}{active&&!clientState.isMobile&&build()}{active&&mobile()}{active&&enemyTarget()}{active&&droneAlert()}{active&&damageIndicator()}{inventory()}{shop()}{missionTerminal()}{fullMap()}{note()}{!clientState.insideOutpost&&elimination()}{scopeOverlay()}{alphaTestLabel()}{mobilePanelClose()}</UiEntity>}
+function hud(){if(clientState.welcomeOpen)return <UiEntity uiTransform={{width:'100%',height:'100%',pointerFilter:'none'}}>{welcomeScreen()}</UiEntity>;if(clientState.cinematicActive)return <UiEntity uiTransform={{width:'100%',height:'100%',pointerFilter:'none'}}>{cinematicOverlay()}</UiEntity>;if(!clientState.joined&&!clientState.joining)return <UiEntity uiTransform={{width:'100%',height:'100%',pointerFilter:'none'}}>{lobby()}{memoryPickup()}{memoryStoryPopup()}{dataStoryPopup()}{missionTerminal()}{shop()}{inventory()}{badgeCollection()}</UiEntity>;const active=!clientState.insideOutpost;return <UiEntity uiTransform={{width:'100%',height:'100%',pointerFilter:'none'}}>{active&&compass()}{settingsMinimap&&minimap()}{active&&mission()}{active&&matchInfo()}{active&&mobilePanelFrames()}{active&&mobileRightStackFrame()}{active&&survival()}{active&&ammo()}{active&&quickbar()}{active&&!clientState.isMobile&&controls()}{active&&(getLocalPlayerState()?.alive??true)&&gameplayFrame()}{active&&!clientState.aiming&&settingsCrosshair&&crosshair()}{controlsOverlay()}{badgeCollection()}{memoryPickup()}{memoryStoryPopup()}{dataStoryPopup()}{missionCompleteBanner()}{active&&!clientState.isMobile&&build()}{active&&mobile()}{active&&enemyTarget()}{active&&droneAlert()}{active&&damageIndicator()}{inventory()}{shop()}{missionTerminal()}{fullMap()}{note()}{!clientState.insideOutpost&&elimination()}{scopeOverlay()}{alphaTestLabel()}{mobilePanelClose()}</UiEntity>}
 export function setupUi(){ReactEcsRenderer.setUiRenderer(hud,{virtualWidth:1920,virtualHeight:1080,screenInset:clientState.isMobile?'none':'device'})}

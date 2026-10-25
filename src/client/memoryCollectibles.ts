@@ -38,7 +38,7 @@ function resetForMission(mission:number){
  // Pack/RAM 01 are fixed Outpost discoveries on the first story mission. If missed, later eligible missions recover them.
  const first=generated?.id===1
  const completedCount=clientState.completedGeneratedMissions.size
- const nextMemory=Array.from({length:10},(_,i)=>i+1).find(id=>completedCount>=id*5&&!clientState.collectedMemoryIds.has(id))
+ const nextMemory=Array.from({length:10},(_,i)=>i+1).find(id=>(id===1 || completedCount>=(id-1)*5)&&!clientState.collectedMemoryIds.has(id))
  const needMemory=nextMemory!==undefined
  const nextRam=Array.from({length:14},(_,i)=>i+1).find(id=>!clientState.collectedDataRamIds.has(id))
  const needRam=nextRam!==undefined
@@ -52,6 +52,7 @@ export function setupMemoryCollectibles(){engine.addSystem((dt)=>{
  const collectibleMission=clientState.missionAcceptedIndex>=0?clientState.missionAcceptedIndex+1:mission
  if(collectibleMission!==spawnedMission){spawnedMission=collectibleMission;resetForMission(collectibleMission)}
  const pt=Transform.getOrNull(engine.PlayerEntity);if(!pt)return
+ if(clientState.memoryStoryOpen||clientState.dataStoryOpen){setArchiveLoadingSound('',false);clientState.memoryPickupActive=false;return}
  let active:Pickup|undefined
  const now=Date.now()
  for(const p of pickups){
@@ -67,10 +68,14 @@ export function setupMemoryCollectibles(){engine.addSystem((dt)=>{
   tr.scale=Vector3.create(pulse,pulse,pulse)
   const aura=Transform.getMutableOrNull(p.aura)
   if(aura){const glow=1.22+Math.sin(t*4.0)*.16;aura.scale=Vector3.create(glow,glow,glow);aura.rotation=Quaternion.fromEulerDegrees(0,(now/8)%360,0)}
-  if(Vector3.distance(pt.position,p.position)<=2.7){active=p;break}
+  // Pickup floats above terrain; compare ground-plane distance to avoid height-related misses.
+  const dx=pt.position.x-p.position.x,dz=pt.position.z-p.position.z
+  if(dx*dx+dz*dz<=2.7*2.7 && Math.abs(pt.position.y-p.position.y)<4){active=p;break}
  }
  if(!active){for(const p of pickups)p.startedAt=0;setArchiveLoadingSound('',false);clientState.memoryPickupActive=false;clientState.memoryPickupProgress=0;clientState.memoryPickupKind='';return}
  if(!active.startedAt){active.startedAt=now;setArchiveLoadingSound(active.kind,true)}
+ // v265: preserve the original 10-second archive loading sequence.
+ // The Memory Pack / Data RAM story image opens only AFTER loading reaches 100%.
  const progress=Math.min(1,(now-active.startedAt)/10000)
  clientState.memoryPickupActive=true;clientState.memoryPickupKind=active.kind;clientState.memoryPickupProgress=progress
  const tr=Transform.getMutable(active.entity)
@@ -82,7 +87,7 @@ export function setupMemoryCollectibles(){engine.addSystem((dt)=>{
  if(progress>=1){
   active.collected=true;setArchiveLoadingSound('',false);engine.removeEntity(active.aura);engine.removeEntity(active.entity)
   clientState.memoryPickupActive=false;clientState.memoryPickupProgress=0
-  if(active.kind==='memory'){const completedCount=clientState.completedGeneratedMissions.size;const memoryId=Array.from({length:10},(_,i)=>i+1).find(id=>completedCount>=id*5&&!clientState.collectedMemoryIds.has(id));if(memoryId!==undefined){clientState.collectedMemoryIds.add(memoryId);clientState.memoryPacksCollected=clientState.collectedMemoryIds.size;clientState.missionMemoryFound+=1;clientState.memoryStoryIndex=memoryId;clientState.memoryStoryPage=0;clientState.memoryStoryOpen=true;setStoryMusic(true)}}else{const ramId=Array.from({length:14},(_,i)=>i+1).find(id=>!clientState.collectedDataRamIds.has(id));if(ramId!==undefined){clientState.collectedDataRamIds.add(ramId);clientState.dataRamsCollected=clientState.collectedDataRamIds.size;clientState.missionDataRamFound+=1;clientState.dataStoryIndex=ramId;clientState.dataStoryPage=0;clientState.dataStoryOpen=true;setStoryMusic(true)}}
+  if(active.kind==='memory'){const completedCount=clientState.completedGeneratedMissions.size;const memoryId=Array.from({length:10},(_,i)=>i+1).find(id=>(id===1 || completedCount>=(id-1)*5)&&!clientState.collectedMemoryIds.has(id));if(memoryId!==undefined){clientState.collectedMemoryIds.add(memoryId);clientState.memoryPacksCollected=clientState.collectedMemoryIds.size;clientState.missionMemoryFound+=1;clientState.memoryStoryIndex=memoryId;clientState.memoryStoryPage=0;clientState.memoryStoryOpen=true;setStoryMusic(true)}}else{const ramId=Array.from({length:14},(_,i)=>i+1).find(id=>!clientState.collectedDataRamIds.has(id));if(ramId!==undefined){clientState.collectedDataRamIds.add(ramId);clientState.dataRamsCollected=clientState.collectedDataRamIds.size;clientState.missionDataRamFound+=1;clientState.dataStoryIndex=ramId;clientState.dataStoryPage=0;clientState.dataStoryOpen=true;setStoryMusic(true)}}
   saveCampaignProgress(true)
   notify(active.kind==='memory'?'MEMORY PACK COLLECTED +1':'DATA RAM COLLECTED +1',4)
  }
