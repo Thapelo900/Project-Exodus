@@ -2,13 +2,13 @@
   "ecs7": true,
   "runtimeVersion": "7",
   "display": {
-    "title": "Project Exodus Alpha Test v0.00",
+    "title": "Project Exodus Alpha v0.00",
     "description": "Project Exodus is an open-world survival experience built in Decentraland where exploration, combat, crafting and strategy collide. You arrive on a mysterious island divided into dangerous regions, including Exodus City, The Outpost, The Arena, Scavenger Camp, The Plant, The Ruins, The Docks and The Beach. Explore the islands, cross bridges, discover hidden locations and collect weapons, ammunition, medical supplies, water and valuable materials. Use gathered resources to construct walls and defenses while preparing for whatever waits beyond the safe zones. Choose your weapons carefully, manage ammunition, use your scope for long-range combat and fight to survive. Whether exploring alone or alongside the community, every journey can lead to new discoveries and challenges. Explore. Loot. Craft. Build. Fight. Survive. Welcome to Project Exodus — a new island, a new beginning.",
     "navmapThumbnail": "scene-thumbnail.jpeg"
   },
   "owner": "",
   "contact": {
-    "name": "Project Exodus",
+    "name": "DiyaoTheGod (NoNameStudios)",
     "email": "diyaothegod@gmail.co"
   },
   "main": "bin/index.js",
@@ -941,9 +941,9 @@
         ]
       },
       "cameraTarget": {
-        "x": 104,
-        "y": 2.5999999046325684,
-        "z": 101.75
+        "x": 96.75,
+        "y": 2.6,
+        "z": 109.35
       }
     }
   ],
