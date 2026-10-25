@@ -104,7 +104,7 @@ export function selectDifficulty(difficulty: Difficulty) {
 function moveToOutpost() {
   void movePlayerTo({
     newRelativePosition: Vector3.create(97.75, 1.2, 102.1),
-    cameraTarget: Vector3.create(105.0, 2.6, 102.1)
+    cameraTarget: Vector3.create(96.75, 2.6, 109.35)
   })
 }
 
