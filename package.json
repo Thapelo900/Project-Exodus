@@ -9,8 +9,8 @@
     "server-logs": "sdk-commands scene-insights tail"
   },
   "devDependencies": {
-    "@dcl/js-runtime": "7.33.1-44149226847.commit-7d1c56d",
-    "@dcl/sdk": "7.33.1-44149226847.commit-7d1c56d",
+    "@dcl/js-runtime": "^7.33.1-44149226847.commit-7d1c56d",
+    "@dcl/sdk": "^7.33.1-44149226847.commit-7d1c56d",
     "archiver": "^7.0.1"
   },
   "engines": {
