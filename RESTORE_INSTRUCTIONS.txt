@@ -1,0 +1,6 @@
+These five source files are exact copies from your uploaded client.zip (the working baseline immediately before v33).
+1. Back up current project.
+2. Copy src/client/* into your Creator Hub project src/client folder, replacing those five files.
+3. DELETE src/client/exodusGuide.ts from the failed v33 patch.
+4. Restart Creator Hub preview.
+No other game files need to be changed for this rollback.

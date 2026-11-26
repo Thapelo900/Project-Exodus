@@ -1,0 +1,6 @@
+Project Exodus v119 — Insignia color ranges
+Private through Captain: opaque yellow Insignia GLB.
+Major through General: opaque deep-red Insignia GLB.
+Exodus Commander: original-color Insignia GLB.
+Existing 1.5x insignia scale, 10% Aura opacity, 10x Aura motion, drone and other systems retained.
+Creator Hub visual verification not performed. No GitHub push.

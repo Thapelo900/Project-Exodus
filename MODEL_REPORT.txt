@@ -1,0 +1,48 @@
+PROJECT EXODUS v104 — GLB Asset Report
+
+Models edited at GLB level; not tested in Decentraland Creator Hub.
+Dimensions use trimesh static scene bounds (metres); animated extents may differ.
+
+Phantom_Scout_v104.glb
+ Source: Phantom_Scout_Hologram.glb
+ Rank/style: sergeant
+ Original XYZ extents: [37079.11376953125, 25694.073973999875, 21442.121887206722]
+ New XYZ extents: [1.12, 0.7761070836198591, 0.647673961760255]
+ Root uniform scale: 3.020568417e-05
+ Preserved animation clips (5): ['Armature|Attack ', 'Armature|DodgeLeft', 'Armature|DodgeRight', 'Armature|Fire', 'Armature|idle']
+
+Spectre_Guardian_v104.glb
+ Source: Spectre_Guardian_Hologram.glb
+ Rank/style: captain
+ Original XYZ extents: [5.357588052749634, 2.2059521341310497, 3.9084600004084287]
+ New XYZ extents: [1.1200001852126298, 0.46115281251028073, 0.8170609388504548]
+ Root uniform scale: 0.209049294
+ Preserved animation clips (0): []
+
+Sovereign_Wraith_v104.glb
+ Source: Sovereign_Wraith_Hologram.glb
+ Rank/style: general
+ Original XYZ extents: [2.4967212653013107, 1.519566593647927, 1.4288458915711775]
+ New XYZ extents: [1.12, 0.6816598266448006, 0.6409635792350211]
+ Root uniform scale: 0.4485883208
+ Preserved animation clips (1): ['Start_Liftoff']
+
+Prestige_Insignia_v104.glb
+ Source: robot_playground.glb
+ Rank/style: insignia
+ Original XYZ extents: [3.465238613783871, 1.954909256474565, 3.4801182278501077]
+ New XYZ extents: [0.7169215637440258, 0.4044502434996902, 0.72]
+ Root uniform scale: 0.206889523
+ Preserved animation clips (1): ['Experiment']
+
+Soldier_Aura_v104.glb
+ Source: sonic-rangers-sonic-spin-aura.glb
+ Rank/style: aura
+ Original XYZ extents: [0.7016825326834675, 0.8903014780429629, 0.9381032692409277]
+ New XYZ extents: [1.49596010522645, 1.8980884242378906, 2.0]
+ Root uniform scale: 2.131961443
+ Preserved animation clips (0): []
+
+All original mesh primitives, skin data and animation channels are retained. Materials were replaced with rank-tinted metallic opaque surfaces (aura uses translucent blend). Texture color overrides removed. Double-sided rendering enabled. A parent transform normalizes the model without modifying the original animated node hierarchy.
+
+NOT IMPLEMENTED IN GLB: avatar-following, runtime pulsing, combat behavior, rank-specific recoloring of shared insignia/aura, and removal of older in-game assets. These require the v103 SDK7 source. No mesh geometry was removed, including any platform geometry in Sovereign Wraith; inspect it before approval.

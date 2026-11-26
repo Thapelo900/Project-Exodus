@@ -1,0 +1,1 @@
+Fixed Trader Shop active tab highlighting using per-tab cinematic artwork. Browse, My Badges, My Listings, Trade Requests each highlight only when selected. List a Trade retains its existing correctly highlighted art. Existing badge positioning and TypeScript logic preserved. This is an incremental patch ZIP, not a full game project.

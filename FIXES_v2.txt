@@ -1,0 +1,1 @@
+Fixed checkerboard exterior alpha; grayscale placeholders; overlapping selection button overlays; cinematic image-backed badge picker. Existing badge unlock data and game logic retained. Requires existing Images/badges assets. Not tested in Creator Hub.

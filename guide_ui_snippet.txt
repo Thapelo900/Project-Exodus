@@ -1,0 +1,18 @@
+function exodusGuideDialogue(){
+ if(!clientState.guideOpen)return null
+ const page=Math.min(3,clientState.guidePage)
+ const lines=[
+ 'Welcome to Exodus, Soldier! We hope you have received all the information, but here is a quick recap.',
+ 'Select a Mission. Recover Data RAMs and Memory Packs to uncover the truth behind the Blackout.',
+ 'Track your performance and obtain exclusive badges. Earn the 30th Badge to fully join the squad and receive your exclusive Exodus Soldier Uniform.',
+ "Don't wait, Soldier! Go to the Mission Terminal and pick your mission."
+ ]
+ const preview=page===2?'BADGE DATABASE   ↖ BACK LEFT':page===3?'MISSION TERMINAL':''
+ return <UiEntity uiTransform={{positionType:'absolute',position:{left:0,top:0},width:'100%',height:'100%',zIndex:300,pointerFilter:'block',justifyContent:'flex-end',alignItems:'center',padding:30}} uiBackground={{color:Color4.fromHexString('#00000088')}}>
+ {preview&&<UiEntity uiTransform={{width:780,height:155,margin:{bottom:15},borderWidth:3,borderColor:Color4.fromHexString('#31dcffff'),alignItems:'center',justifyContent:'center'}} uiBackground={{color:Color4.fromHexString('#082a3de9')}}><Label value={preview} fontSize={29} color={Color4.White}/><UiEntity uiTransform={{width:580,height:75}} uiBackground={{texture:{src:page===2?'Images/ui/badge.png':'Images/outpost-mission-terminal.png'},textureMode:'contain'}}/></UiEntity>}
+ <UiEntity uiTransform={{width:950,height:225,padding:18,justifyContent:'space-between',borderWidth:3,borderColor:Color4.fromHexString('#d24d56ff')}} uiBackground={{color:Color4.fromHexString('#0b1724f5')}}>
+ <Label value={'EXODUS SOLDIER GUIDE  /  '+(page+1)+'/4'} fontSize={25} color={Color4.fromHexString('#ff7777ff')}/>
+ <Label value={lines[page]} fontSize={23} color={Color4.White} uiTransform={{width:'100%',height:105}}/>
+ <Button value={page===3?'FINISH':'NEXT  >'} fontSize={22} color={Color4.White} uiTransform={{width:175,height:45,alignSelf:'flex-end'}} uiBackground={{color:Color4.fromHexString('#a52d37ff')}} onMouseDown={()=>{if(page===3){clientState.guideOpen=false;clientState.guidePage=0}else clientState.guidePage=page+1}}/>
+ </UiEntity></UiEntity>
+}

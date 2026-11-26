@@ -1,0 +1,1 @@
+Project Exodus SDK7 source patch. Back up your original project; extract this ZIP into the project root, preserving src paths. Does not include assets or node_modules. SDK dependency unchanged. npm ci and tsc/build were not completed in this environment; validate locally before publishing.

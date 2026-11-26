@@ -1,24 +1,14 @@
-PROJECT EXODUS v38 — SOURCE INSPECTION REPAIR
-Based on user-uploaded New folder.zip.
-
-1. Back up your Creator Hub project.
-2. Extract into the project root, preserving src/client and Images paths.
-3. Keep the current OutPost.glb and terrainFixes.ts — neither is changed.
-4. Check that images are at Images/story/... and Images/ui/exodus-expanded/...
-   NOT Images/Images/...
-
-CHANGES
-- Terminal interaction callbacks are protected against duplicate events.
-- Terminal handlers keep checking for re-created targets rather than permanently stopping.
-- Archive initialization and story overlays remain renderable if the game is still on the lobby/joining transition.
-- Loading UI label explicitly says INITIALIZING, using the original 10-second timer.
-- Restores archive story art and loading-frame assets at the exact paths referenced by UI.
-- Stops simultaneous collection when a story panel is already open.
-
-LIMITATIONS
-- No change to terminal coordinates or OutPost.glb.
-- A full game runtime test and SDK typecheck have not been performed.
-- The provided full-game ZIP had no Images directory. Missing images in the archive
-  do not prove they are absent from the user's installed Creator Hub project.
-- If terminals still fail to open, examine Creator Hub console for runtime errors.
-- GitHub was not changed.
+PROJECT EXODUS v47 - NPC HEADGEAR, BACKPACK & DIALOG ART
+Based on v46. Apply to a BACKUP of your Creator Hub project.
+- Added headgear URN collection 0x57d1814be35f2f041562b05993ead98507449576 item 0
+- Added backpack URN collection 0x0de00d1d548c0ff2766754cedf695fd5c9e753dd item 0
+- New transparent angular tactical red-black border art and NPC portrait with headgear
+- Badge hologram image uses user's supplied reference art (STATIC visual)
+- Mission hologram separate stylized panel
+- Four-stage dialogue preserved; NEXT and FINISH kept above art in clickable layer
+- Existing v46 camera, v40 startup, cinematics untouched.
+LIMITATIONS: NFT wearable loading NOT verified in Decentraland. NPC portrait is illustrative, not a real snapshot of rendered NPC.
+Badge hologram is a static illustration, not the live Badge Terminal UI. It contains the reference's original numbers, not dynamic counts.
+UI visual not guaranteed pixel-identical. ZIP integrity checked but NOT compiled/runtime tested.
+GitHub unchanged.
+Rollback: restore v40 setup.ts/ui.tsx and delete soldierGuide.ts; remove added art if desired.

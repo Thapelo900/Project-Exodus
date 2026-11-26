@@ -1,0 +1,15 @@
+PROJECT EXODUS — ROLLBACK TO PRE-WEARABLES STATE
+
+This restores the exact src/client/setup.ts and src/client/soldierGuide.ts from your uploaded src (9).zip, BEFORE the custom soldier outfit prototype.
+
+HOW TO APPLY
+1. CLOSE Creator Hub / stop the local scene preview.
+2. Back up your current project.
+3. Copy the src folder from this ZIP into your Project Exodus root, choosing Replace for the two files.
+4. Delete src/client/exodusOutfit.ts if present.
+5. Optional cleanup: delete assets/Models/ExodusSoldier/ (only if it was added by the wearable prototype and you don't need those copies).
+6. Restart Creator Hub and reload the scene.
+
+IMPORTANT: The rollback does not change your HUD/UI, missions, weapons, or other project code. It does not erase the original standalone GLBs you uploaded.
+
+The two restored files are byte-for-byte copies of your pre-wearable source upload. Creator Hub runtime testing has not been performed.
